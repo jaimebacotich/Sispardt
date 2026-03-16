@@ -1,0 +1,5 @@
+# Falsos positivos — .env.example solo contiene valores de ejemplo, no credenciales reales
+.env.example:generic-api-key:59
+.env.example:generic-api-key:64
+.env.example:generic-api-key:65
+.env.example:generic-api-key:71

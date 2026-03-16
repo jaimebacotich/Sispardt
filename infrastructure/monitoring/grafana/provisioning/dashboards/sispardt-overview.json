@@ -1,0 +1,190 @@
+{
+  "title": "SISPARDT - Overview",
+  "uid": "sispardt-overview",
+  "tags": ["sispardt"],
+  "timezone": "America/La_Paz",
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Servicios activos",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "count(up{job=~\"svc-.*\"} == 1)",
+          "legendFormat": "Servicios up"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 2 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Requests/segundo — API Gateway",
+      "type": "timeseries",
+      "gridPos": { "x": 4, "y": 0, "w": 10, "h": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "sum(rate(traefik_router_requests_total[1m])) by (router)",
+          "legendFormat": "{{router}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Latencia p95 — requests HTTP",
+      "type": "timeseries",
+      "gridPos": { "x": 14, "y": 0, "w": 10, "h": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job))",
+          "legendFormat": "p95 {{job}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Conexiones activas — PostgreSQL Establecimientos",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 4, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "pg_stat_activity_count{job=\"postgres-establecimientos\", state=\"active\"}",
+          "legendFormat": "Activas"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Conexiones activas — PostgreSQL Movimientos",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 8, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "pg_stat_activity_count{job=\"postgres-movimientos\", state=\"active\"}",
+          "legendFormat": "Activas"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Errores 4xx/5xx — Traefik",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "sum(rate(traefik_router_requests_total{code=~\"4..|5..\"}[5m])) by (code)",
+          "legendFormat": "HTTP {{code}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "thresholdsStyle": { "mode": "line" } },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green" }, { "color": "red", "value": 1 }]
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "CPU del host",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)",
+          "legendFormat": "CPU %"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "id": 8,
+      "title": "RAM disponible",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 14, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100",
+          "legendFormat": "RAM disponible %"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "id": 9,
+      "title": "Lag del consumer Kafka (replica_cache)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 14, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "kafka_consumergroup_lag{consumergroup=\"sispardt-replica-consumer\"}",
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["max"] },
+        "colorMode": "background"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Keycloak — autenticaciones/min",
+      "type": "timeseries",
+      "gridPos": { "x": 14, "y": 14, "w": 10, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "rate(keycloak_credentials_password_hashing_validations_total{outcome=\"valid\",realm=\"sispardt\"}[1m])",
+          "legendFormat": "Logins exitosos/min"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "rate(keycloak_credentials_password_hashing_validations_total{outcome=\"invalid\",realm=\"sispardt\"}[1m])",
+          "legendFormat": "Intentos fallidos/min"
+        }
+      ]
+    }
+  ]
+}

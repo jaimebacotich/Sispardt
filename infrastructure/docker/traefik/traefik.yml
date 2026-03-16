@@ -1,0 +1,45 @@
+# ============================================================
+# SISPARDT - Traefik v3 - Configuración API Gateway
+# ============================================================
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# Dashboard (accesible en localhost:8090)
+api:
+  dashboard: true
+  insecure: true
+
+# Endpoint de ping para healthcheck
+ping: {}
+
+# Puntos de entrada
+entryPoints:
+  web:
+    address: ":80"
+    # En producción añadir websecure (443) con TLS
+
+# Proveedor: Docker (descubrimiento automático por labels)
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: sispardt-net
+    watch: true
+
+# Logs estructurados en JSON
+log:
+  level: INFO
+  format: json
+
+# Access log con campos relevantes
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: drop
+      names:
+        Authorization: redact
+        X-Forwarded-For: keep

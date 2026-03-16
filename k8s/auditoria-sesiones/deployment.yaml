@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-auditoria-sesiones
+  namespace: sispardt
+  labels:
+    app: svc-auditoria-sesiones
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-auditoria-sesiones
+  template:
+    metadata:
+      labels:
+        app: svc-auditoria-sesiones
+    spec:
+      imagePullSecrets:
+        - name: ghcr-cred
+      containers:
+        - name: svc-auditoria-sesiones
+          # ${IMAGE_OWNER} y ${IMAGE_TAG} son sustituidos por envsubst en el deploy
+          image: ghcr.io/${IMAGE_OWNER}/sispardt-auditoria-sesiones:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          env:
+            - name: PORT
+              value: "8084"
+            - name: DB_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: AUD_SES_DB_DSN
+            - name: KEYCLOAK_JWKS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_JWKS_URL
+            - name: KEYCLOAK_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_ISSUER
+            - name: KEYCLOAK_ADMIN_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_ADMIN_URL
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_REALM
+            - name: KC_CLIENT_ID
+              value: "sispardt-auditoria-sesiones-svc"
+            - name: KC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: KC_SECRET_AUD
+            - name: POLL_INTERVAL_SECONDS
+              value: "10"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
