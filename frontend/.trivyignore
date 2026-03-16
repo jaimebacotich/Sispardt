@@ -1,0 +1,29 @@
+# ============================================================
+# Trivy — Excepciones documentadas de vulnerabilidades
+# Proyecto: SISPARDT Frontend (Next.js)
+# ============================================================
+#
+# Cada entrada debe incluir:
+#   - ID de la vulnerabilidad
+#   - Justificación de la aceptación del riesgo
+#   - Fecha de revisión y responsable
+#   - Condición para levantar la excepción
+#
+# ============================================================
+
+# GHSA-h25m-26qc-wcjf — Next.js HTTP request deserialization DoS
+# Severidad: HIGH
+# Biblioteca afectada: next@14.2.35
+# Fix disponible: Solo en Next.js >= 15.0.8 (migración mayor)
+# Justificación:
+#   La corrección requiere migrar de Next.js 14 a 15, lo que implica
+#   cambios incompatibles en el sistema de rutas, componentes del servidor
+#   y configuración general. La migración está planificada pero fuera del
+#   alcance del sprint actual.
+#   El vector de ataque requiere que el servidor procese requests HTTP
+#   con payloads maliciosos en contextos React Server Components específicos.
+#   El riesgo operativo inmediato es bajo dado el entorno de despliegue
+#   controlado (red interna, sin exposición pública directa).
+# Revisado por: @jaimebacotich — 2026-03-15
+# Condición para levantar: Al migrar a Next.js 15.x
+GHSA-h25m-26qc-wcjf

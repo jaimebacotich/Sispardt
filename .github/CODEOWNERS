@@ -1,0 +1,23 @@
+# CODEOWNERS — Sispardt
+# Define los revisores obligatorios por área del repositorio.
+# GitHub requiere aprobación de estos usuarios antes de hacer merge a main.
+# Documentación: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ── Propietario global (revisor por defecto para cualquier archivo) ────────────
+*                               @jaimebacotich
+
+# ── Pipeline CI/CD y configuración de seguridad ───────────────────────────────
+.github/                        @jaimebacotich
+
+# ── Infraestructura y Kubernetes ──────────────────────────────────────────────
+k8s/                            @jaimebacotich
+infrastructure/                 @jaimebacotich
+docker-compose*.yml             @jaimebacotich
+
+# ── Microservicios Go ─────────────────────────────────────────────────────────
+services/establecimientos/      @jaimebacotich
+services/movimientos/           @jaimebacotich
+services/kafka-consumer/        @jaimebacotich
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+frontend/                       @jaimebacotich

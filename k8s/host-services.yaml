@@ -1,0 +1,112 @@
+# ============================================================
+# Host Services — Bridge entre k3s y Docker Compose
+#
+# Los pods de k3s se comunican con los servicios de
+# Docker Compose (Postgres, Kafka, Keycloak) usando estos
+# Services/Endpoints que apuntan a la IP del nodo (${NODE_IP}).
+#
+# ${NODE_IP} es sustituido por envsubst en el deploy workflow.
+#
+# Puertos del host (mapeados por Docker Compose):
+#   db-establecimientos → NODE_IP:5432
+#   db-movimientos      → NODE_IP:5433
+#   keycloak            → NODE_IP:8080
+#   kafka               → NODE_IP:9092
+# ============================================================
+
+# ─── db-establecimientos ──────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-establecimientos
+  namespace: sispardt
+spec:
+  ports:
+    - name: pg
+      port: 5432
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: db-establecimientos
+  namespace: sispardt
+subsets:
+  - addresses:
+      - ip: ${NODE_IP}
+    ports:
+      - name: pg
+        port: 5432
+
+---
+# ─── db-movimientos ───────────────────────────────────────────────────────────
+# Nota: Docker Compose expone db-movimientos en host port 5433
+#       (internamente es 5432). El Service traduce 5432→5433 via named port.
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-movimientos
+  namespace: sispardt
+spec:
+  ports:
+    - name: pg
+      port: 5432
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: db-movimientos
+  namespace: sispardt
+subsets:
+  - addresses:
+      - ip: ${NODE_IP}
+    ports:
+      - name: pg
+        port: 5433
+
+---
+# ─── keycloak ─────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: sispardt
+spec:
+  ports:
+    - name: http
+      port: 8080
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: keycloak
+  namespace: sispardt
+subsets:
+  - addresses:
+      - ip: ${NODE_IP}
+    ports:
+      - name: http
+        port: 8080
+
+---
+# ─── kafka ────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: sispardt
+spec:
+  ports:
+    - name: kafka
+      port: 9092
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: kafka
+  namespace: sispardt
+subsets:
+  - addresses:
+      - ip: ${NODE_IP}
+    ports:
+      - name: kafka
+        port: 9092

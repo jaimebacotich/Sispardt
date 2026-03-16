@@ -1,0 +1,91 @@
+# ============================================================
+# SISPARDT — .gitignore
+# ============================================================
+
+# Entornos y secretos
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Dependencias Node.js
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.production
+*.exe
+services/*/server
+
+# Go build artifacts
+bin/
+services/*/tmp/
+*.exe
+services/*/tmp_app
+services/*/tmp_app.exe
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs y archivos temporales de desarrollo
+*.log
+*.txt
+logs/
+doc/
+
+# Cobertura de tests
+coverage/
+*.out
+
+# Base de datos local (volcados)
+*.sql.bak
+dump/
+
+# Kafka / Debezium (offsets locales)
+kafka-data/
+zookeeper-data/
+
+# Grafana / Prometheus (datos locales)
+grafana-data/
+prometheus-data/
+
+# K8s secrets generados localmente
+k8s/secrets/
+
+# Documentación interna / archivos de trabajo
+PLAN_FRONTEND.md
+DOCUMENTO_TECNICO.md
+DOCUMENTO_ACADEMICO.md
+Plan\ microservicio\ Auditoria_sesiones.md
+test-jwt*.js
+*.md
+
+# Volcados de base de datos
+db_script_local/establecimientos.sql
+db_script_local/movimientos.sql
+
+# Mocks de desarrollo
+frontend/src/lib/mocks.ts
+frontend/src/lib/mock-catalogos.ts
+
+# Herramientas de desarrollo local
+.claude/
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+.next/
+node_modules/

@@ -1,0 +1,86 @@
+# ============================================================
+# Ingress — Traefik (k3s built-in)
+#
+# Espeja el enrutamiento de Docker Compose / Traefik:
+#   /api/v1/partes, /cierres, /habitaciones,
+#   /estadisticas, /catalogos/movimientos, /movimientos
+#     → svc-movimientos:8082
+#
+#   /api/v1/establecimientos, /geo, /auditoria,
+#   /catalogos (excl. /movimientos), /personal
+#     → svc-establecimientos:8081
+#
+#   /  → svc-frontend:3000
+#
+# Nota sobre versión de API de Traefik:
+#   k3s ≥ v1.30 (Traefik v3)  → traefik.io/v1alpha1   (este archivo)
+#   k3s < v1.30 (Traefik v2)  → traefik.containo.us/v1alpha1
+#
+# Verificar versión instalada:
+#   kubectl get crd ingressroutes.traefik.io 2>/dev/null \
+#     || echo "usar traefik.containo.us/v1alpha1"
+# ============================================================
+
+# ─── Movimientos (rutas de mayor prioridad) ───────────────────────────────────
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sispardt-movimientos
+  namespace: sispardt
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: >-
+        PathPrefix(`/api/v1/partes`) ||
+        PathPrefix(`/api/v1/cierres`) ||
+        PathPrefix(`/api/v1/habitaciones`) ||
+        PathPrefix(`/api/v1/estadisticas`) ||
+        PathPrefix(`/api/v1/catalogos/movimientos`) ||
+        PathPrefix(`/api/v1/movimientos`)
+      priority: 20
+      services:
+        - name: svc-movimientos
+          port: 8082
+
+---
+# ─── Establecimientos ─────────────────────────────────────────────────────────
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sispardt-establecimientos
+  namespace: sispardt
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: >-
+        PathPrefix(`/api/v1/establecimientos`) ||
+        PathPrefix(`/api/v1/geo`) ||
+        PathPrefix(`/api/v1/auditoria`) ||
+        PathPrefix(`/api/v1/catalogos`) ||
+        PathPrefix(`/api/v1/personal`)
+      priority: 10
+      services:
+        - name: svc-establecimientos
+          port: 8081
+
+---
+# ─── Frontend (catch-all) ─────────────────────────────────────────────────────
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sispardt-frontend
+  namespace: sispardt
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: PathPrefix(`/`)
+      priority: 1
+      services:
+        - name: svc-frontend
+          port: 3000

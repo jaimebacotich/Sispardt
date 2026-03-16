@@ -1,0 +1,505 @@
+# ============================================================
+# SISPARDT — CI/CD Pipeline (DevSecOps)
+# Runner: self-hosted (misma VM que k3s)
+# Registry: ghcr.io
+#
+# Etapas de seguridad:
+#   1. Secrets scan     — Gitleaks (detecta credenciales en el código)
+#   2. SAST Go          — gosec para servicios Go
+#   3. SAST Semgrep     — reglas Go + TypeScript multi-lenguaje
+#   4. Quality/SCA      — ESLint (bloquea) + npm audit (informativo)
+#   5. Build + SCA FS   — Trivy FS (dependencias) antes del build
+#   6. Image scan       — Trivy (CVEs en imágenes Docker, bloquea en CRITICAL)
+#   7. Deploy           — kubectl apply a k3s
+#   8. Smoke Test       — validación HTTP post-deploy
+#   9. DAST             — OWASP ZAP Baseline contra la app desplegada
+# ============================================================
+#
+# SECRETS requeridos en GitHub → Settings → Secrets → Actions:
+#
+#   ENV_FILE           Contenido completo del archivo .env (nunca commitear el .env)
+#   GHCR_PAT           Personal Access Token con scope read:packages y write:packages
+#   APP_PASS_ADMIN     Contraseña del usuario PostgreSQL app_admin
+#   APP_PASS_RECEP     Contraseña del usuario PostgreSQL app_recepcionista
+#   APP_PASS_ESTAD     Contraseña del usuario PostgreSQL app_resp_estadistica
+#   KC_SECRET_EST_SVC  Keycloak client secret — sispardt-establecimientos-svc
+#   KC_SECRET_MOV_SVC  Keycloak client secret — sispardt-movimientos-svc
+#   NEXTAUTH_SECRET    NextAuth session secret (mínimo 32 caracteres)
+#   DEFAULT_USER_PASSWORD  Contraseña inicial temporal para usuarios creados desde Personal
+#
+# NOTA: sispardt-web es cliente público en Keycloak (sin secret).
+# ============================================================
+
+name: CI/CD
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write   # requerido por Trivy para subir resultados SARIF
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ─── 1. Secrets Scan — Gitleaks ──────────────────────────────────────────────
+  secrets-scan:
+    name: "Security · Secrets Scan (Gitleaks)"
+    runs-on: self-hosted
+    steps:
+      - name: Checkout (historial completo para Gitleaks)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar y ejecutar Gitleaks
+        run: |
+          GITLEAKS_VERSION="8.18.4"
+          wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+          tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz gitleaks
+          ./gitleaks detect --source . --verbose --no-git
+          rm -f gitleaks gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+
+  # ─── 2. SAST — gosec (servicios Go) ──────────────────────────────────────────
+  sast-go:
+    name: "Security · SAST Go (gosec)"
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar gosec y analizar servicios Go
+        run: |
+          # Buscar go en rutas comunes
+          for p in /usr/local/go/bin /usr/bin /snap/bin /usr/local/bin "$HOME/sdk/go/bin"; do
+            [ -x "$p/go" ] && export PATH=$PATH:$p && break
+          done
+          # Si no está instalado, descargar go temporalmente
+          if ! command -v go &>/dev/null; then
+            echo "Go no encontrado — instalando temporalmente..."
+            wget -q https://go.dev/dl/go1.22.4.linux-amd64.tar.gz -O /tmp/go.tar.gz
+            mkdir -p "$HOME/.local"
+            tar -xzf /tmp/go.tar.gz -C "$HOME/.local"
+            export PATH=$PATH:$HOME/.local/go/bin
+            rm /tmp/go.tar.gz
+          fi
+          go version
+          export GOPATH=${GOPATH:-$HOME/go}
+          export PATH=$PATH:$GOPATH/bin
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          $GOPATH/bin/gosec -fmt=text ./services/establecimientos/...
+          $GOPATH/bin/gosec -fmt=text ./services/movimientos/...
+          $GOPATH/bin/gosec -fmt=text ./services/kafka-consumer/...
+
+  # ─── 3. SAST — Semgrep (Go + TypeScript) ────────────────────────────────────
+  sast-semgrep:
+    name: "Security · SAST Semgrep (Go + TypeScript)"
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ejecutar Semgrep (vía Docker)
+        run: |
+          # Usar imagen oficial de Semgrep — no requiere pip/Python en el runner
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            semgrep/semgrep:latest \
+            semgrep --config=p/golang \
+              --error \
+              /src/services/establecimientos \
+              /src/services/movimientos \
+              /src/services/kafka-consumer
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            semgrep/semgrep:latest \
+            semgrep --config=p/typescript \
+              --error \
+              /src/frontend/src
+
+  # ─── 4. Calidad + Audit — frontend ───────────────────────────────────────────
+  dependency-audit:
+    name: "Quality · ESLint + Dependency Audit (npm)"
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias, lint y auditar
+        run: |
+          # Agregar node embebido del runner al PATH (excluir versiones alpine, incompatibles con glibc)
+          for d in "$HOME/Termi/actions-runner/externals"*/node*/bin; do
+            echo "$d" | grep -q "alpine" && continue
+            [ -d "$d" ] && [ -x "$d/node" ] && export PATH=$PATH:$d && echo "node encontrado: $d" && break
+          done
+          # Intentar nvm como alternativa
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+          # Fallback rutas del sistema
+          if ! command -v node &>/dev/null; then
+            for p in /usr/bin /usr/local/bin /snap/bin; do
+              [ -x "$p/node" ] && export PATH=$PATH:$p && break
+            done
+          fi
+          node --version
+          npm --version
+          cd frontend && npm ci --ignore-scripts --legacy-peer-deps
+          # Análisis de calidad — bloquea ante errores ESLint
+          npm run lint
+          # Auditar: informativo (las HIGH requieren breaking changes — next@16, registradas en logs)
+          npm audit --legacy-peer-deps || true
+
+  # ─── 4. Build & Push ─────────────────────────────────────────────────────────
+  build:
+    name: "Build · ${{ matrix.service }}"
+    runs-on: self-hosted
+    needs: [secrets-scan, sast-go, sast-semgrep, dependency-audit]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: establecimientos
+            context: services/establecimientos
+          - service: movimientos
+            context: services/movimientos
+          - service: kafka-consumer
+            context: services/kafka-consumer
+          - service: frontend
+            context: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Trivy FS — SCA antes del build (dependencias del código fuente) ────────
+      - name: "Security · SCA filesystem (Trivy FS)"
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "./${{ matrix.context }}"
+          format: "table"
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"          # bloquea ante CVEs críticos o altos en dependencias
+          trivyignores: "./${{ matrix.context }}/.trivyignore"
+
+      - name: Construir imagen Docker
+        run: |
+          docker build \
+            -t $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:${{ github.sha }} \
+            -t $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:latest \
+            ./${{ matrix.context }}
+
+      # ── Trivy Image — escaneo de imagen Docker construida ────────────────────
+      - name: "Security · Escanear imagen con Trivy"
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.REGISTRY }}/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:${{ github.sha }}"
+          format: "table"
+          severity: "CRITICAL"
+          exit-code: "1"          # bloquea ante CVEs críticos en la imagen final
+
+      - name: Login a ghcr.io
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GHCR_PAT }}" | docker login $REGISTRY -u ${{ github.actor }} --password-stdin
+
+      - name: Push imagen (solo en main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:${{ github.sha }}
+          docker push $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:latest
+
+  # ─── 6. Deploy a k3s ─────────────────────────────────────────────────────────
+  deploy:
+    name: "Deploy → k3s"
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Infraestructura Docker Compose ───────────────────────────────────────
+      - name: Crear .env desde secreto
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
+        run: echo "$ENV_FILE_CONTENT" > $GITHUB_WORKSPACE/.env
+
+      - name: Levantar infraestructura (Docker Compose)
+        # Solo infraestructura — los servicios de app los maneja k3s exclusivamente
+        # (evita conflicto de puerto 80 entre Traefik Docker y Traefik k3s)
+        run: |
+          docker compose -f $GITHUB_WORKSPACE/docker-compose.yml up -d --remove-orphans \
+            db-establecimientos db-movimientos db-keycloak keycloak keycloak-init \
+            kafka debezium kafka-ui kafka-init svc-kafka-consumer \
+            prometheus grafana node-exporter postgres-exporter-est postgres-exporter-mov
+
+      - name: Esperar que la infraestructura esté healthy
+        run: |
+          echo "Esperando que los servicios críticos estén healthy..."
+          for svc in sispardt-db-establecimientos sispardt-db-movimientos sispardt-keycloak; do
+            echo -n "  → $svc: "
+            for i in $(seq 1 30); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' $svc 2>/dev/null || echo "missing")
+              if [ "$STATUS" = "healthy" ]; then
+                echo "healthy ✓"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "timeout (último estado: $STATUS)"
+              fi
+              sleep 10
+            done
+          done
+
+      # ── Verificar y recuperar conector Debezium ──────────────────────────────
+      - name: Verificar conector Debezium
+        run: |
+          echo "Esperando que kafka-init registre el conector..."
+          for i in $(seq 1 12); do
+            STATE=$(curl -sf http://localhost:8083/connectors/sispardt-establecimientos-source/status \
+              | python3 -c "import sys,json; t=json.load(sys.stdin)['tasks']; print(t[0]['state'] if t else 'NO_TASKS')" 2>/dev/null || echo "NOT_READY")
+            echo "  intento $i/12 — task state: $STATE"
+            if [ "$STATE" = "RUNNING" ]; then
+              echo "Conector Debezium OK ✓"
+              break
+            fi
+            if [ "$STATE" = "FAILED" ]; then
+              echo "  Task FAILED — reiniciando..."
+              curl -sf -X POST http://localhost:8083/connectors/sispardt-establecimientos-source/tasks/0/restart || true
+            fi
+            sleep 10
+          done
+
+      # ── Obtener IP del nodo k3s (misma VM que Docker Compose) ────────────────
+      - name: Obtener IP del nodo
+        id: node
+        run: |
+          IP=$(kubectl get nodes \
+            -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' \
+            | tr ' ' '\n' | grep -E '^[0-9]+\.' | head -1)
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "Node IP detectada: $IP"
+
+      # ── Namespace ─────────────────────────────────────────────────────────────
+      - name: Aplicar namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
+      # ── Secret para pull de ghcr.io desde k3s ────────────────────────────────
+      - name: Crear/actualizar imagePullSecret (ghcr-cred)
+        run: |
+          kubectl create secret docker-registry ghcr-cred \
+            --namespace=sispardt \
+            --docker-server=$REGISTRY \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GHCR_PAT }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ── Endpoints para servicios Docker Compose en el host ───────────────────
+      - name: Aplicar host-services (bridge a Docker Compose)
+        env:
+          NODE_IP: ${{ steps.node.outputs.ip }}
+        run: envsubst '${NODE_IP}' < k8s/host-services.yaml | kubectl apply -f -
+
+      # ── ConfigMap (configuración no sensible) ────────────────────────────────
+      - name: Crear/actualizar ConfigMap
+        env:
+          NODE_IP: ${{ steps.node.outputs.ip }}
+        run: |
+          kubectl create configmap sispardt-config \
+            --namespace=sispardt \
+            --from-literal=NODE_IP=${NODE_IP} \
+            --from-literal=KEYCLOAK_ISSUER=http://${NODE_IP}:8080/realms/sispardt \
+            --from-literal=KEYCLOAK_JWKS_URL=http://${NODE_IP}:8080/realms/sispardt/protocol/openid-connect/certs \
+            --from-literal=KEYCLOAK_ADMIN_URL=http://${NODE_IP}:8080 \
+            --from-literal=KEYCLOAK_REALM=sispardt \
+            --from-literal=KEYCLOAK_CLIENT_ID_EST=sispardt-establecimientos-svc \
+            --from-literal=KEYCLOAK_CLIENT_ID_MOV=sispardt-movimientos-svc \
+            --from-literal=SISTEMA_INICIO_DATE=2026-03-10 \
+            --from-literal=API_ESTABLECIMIENTOS_URL=http://svc-establecimientos.sispardt.svc.cluster.local:8081 \
+            --from-literal=API_MOVIMIENTOS_URL=http://svc-movimientos.sispardt.svc.cluster.local:8082 \
+            --from-literal=NEXTAUTH_URL=http://${NODE_IP} \
+            --from-literal=AUTH_KEYCLOAK_ID=sispardt-web \
+            --from-literal=AUTH_KEYCLOAK_ISSUER=http://${NODE_IP}:8080/realms/sispardt \
+            --from-literal=NEXT_PUBLIC_API_BASE_URL=http://${NODE_IP} \
+            --from-literal=NEXT_PUBLIC_INICIO_SISTEMA=2026-03-10 \
+            --from-literal=NEXT_PUBLIC_PAIS_DEFECTO=1 \
+            --from-literal=NEXT_PUBLIC_DIVISION_PRINCIPAL=1 \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ── Secret (credenciales sensibles — nunca en el repositorio) ─────────────
+      - name: Crear/actualizar Secret
+        run: |
+          EST_DSN="postgresql://app_responsable_registro:${{ secrets.APP_PASS_RESP_REG }}@db-establecimientos:5432/sispardt_establecimientos?sslmode=disable"
+          MOV_DSN="postgresql://app_recepcionista:${{ secrets.APP_PASS_RECEP }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
+          MOV_STATS_DSN="postgresql://app_resp_estadistica:${{ secrets.APP_PASS_ESTAD }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
+          KC_DSN="postgresql://app_admin_general:${{ secrets.APP_PASS_ADMIN }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
+
+          kubectl create secret generic sispardt-secrets \
+            --namespace=sispardt \
+            --from-literal=EST_DB_DSN="${EST_DSN}" \
+            --from-literal=MOV_DB_DSN="${MOV_DSN}" \
+            --from-literal=MOV_DB_DSN_STATS="${MOV_STATS_DSN}" \
+            --from-literal=KC_CONSUMER_DB_DSN="${KC_DSN}" \
+            --from-literal=KC_SECRET_EST=${{ secrets.KC_SECRET_EST_SVC }} \
+            --from-literal=KC_SECRET_MOV=${{ secrets.KC_SECRET_MOV_SVC }} \
+            --from-literal=NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} \
+            --from-literal=AUTH_KEYCLOAK_SECRET="" \
+            --from-literal=DEFAULT_USER_PASSWORD=${{ secrets.DEFAULT_USER_PASSWORD }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ── Deployments (imagen con sha del commit) ───────────────────────────────
+      - name: Aplicar Deployments
+        env:
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          for dir in k8s/establecimientos k8s/movimientos k8s/frontend; do
+            envsubst '${IMAGE_OWNER} ${IMAGE_TAG}' < ${dir}/deployment.yaml | kubectl apply -f -
+          done
+
+      # ── Services e Ingress ────────────────────────────────────────────────────
+      - name: Aplicar Services e Ingress
+        run: |
+          kubectl apply -f k8s/establecimientos/service.yaml
+          kubectl apply -f k8s/movimientos/service.yaml
+          kubectl apply -f k8s/frontend/service.yaml
+          kubectl apply -f k8s/ingress.yaml
+
+      # ── Verificar rollouts ────────────────────────────────────────────────────
+      - name: Verificar rollouts
+        run: |
+          kubectl rollout status deployment/svc-establecimientos -n sispardt --timeout=5m
+          kubectl rollout status deployment/svc-movimientos      -n sispardt --timeout=5m
+          kubectl rollout status deployment/svc-frontend         -n sispardt --timeout=5m
+
+      # ── Smoke Test — validación HTTP post-deploy ─────────────────────────────
+      - name: "Smoke Test · Validar endpoints críticos"
+        env:
+          NODE_IP: ${{ steps.node.outputs.ip }}
+        run: |
+          echo "Esperando que los pods estén listos para recibir tráfico..."
+          sleep 10
+
+          check() {
+            local name=$1 url=$2 expected=$3
+            echo -n "  → $name ($url): "
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "$url" || echo "000")
+            if [ "$STATUS" = "$expected" ]; then
+              echo "HTTP $STATUS ✓"
+            else
+              echo "HTTP $STATUS ✗ (esperado $expected)"
+              exit 1
+            fi
+          }
+
+          # Microservicio establecimientos — endpoint de salud
+          check "svc-establecimientos /health" "http://${NODE_IP}:30081/health" "200"
+          # Microservicio movimientos — endpoint de salud
+          check "svc-movimientos /health"      "http://${NODE_IP}:30082/health" "200"
+          # Frontend — página principal (responde 200 o 307 redirect)
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 15 "http://${NODE_IP}" || echo "000")
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "307" ] || [ "$STATUS" = "302" ]; then
+            echo "  → frontend (http://${NODE_IP}): HTTP $STATUS ✓"
+          else
+            echo "  → frontend (http://${NODE_IP}): HTTP $STATUS ✗"
+            exit 1
+          fi
+
+          echo "Smoke Test completado — todos los endpoints responden correctamente."
+
+      - name: Resumen del deploy
+        if: always()
+        run: |
+          echo "=== Pods en namespace sispardt ==="
+          kubectl get pods -n sispardt
+          echo ""
+          echo "=== Services ==="
+          kubectl get svc -n sispardt
+          echo ""
+          echo "=== Ingress ==="
+          kubectl get ingress -n sispardt
+
+  # ─── 7. DAST — OWASP ZAP Baseline ───────────────────────────────────────────
+  dast:
+    name: "Security · DAST (OWASP ZAP Baseline)"
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+
+    steps:
+      - name: Obtener IP del nodo
+        id: node
+        run: |
+          IP=$(kubectl get nodes \
+            -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' \
+            | tr ' ' '\n' | grep -E '^[0-9]+\.' | head -1)
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+          echo "Node IP detectada: $IP"
+
+      - name: Preparar directorio de reportes
+        run: |
+          mkdir -p /tmp/zap-reports
+          chmod 777 /tmp/zap-reports
+
+      # ── ZAP Baseline — Frontend ───────────────────────────────────────────
+      # zap-baseline.py: escaneo pasivo + reglas de alerta sin ataque activo
+      # -I: no fallar en WARN (Medium), sólo en FAIL (High/Critical)
+      # -r: reporte HTML  -J: reporte JSON
+      - name: "DAST · ZAP Baseline — Frontend"
+        env:
+          NODE_IP: ${{ steps.node.outputs.ip }}
+        run: |
+          docker run --rm \
+            --network host \
+            -v /tmp/zap-reports:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "http://${NODE_IP}" \
+              -r zap-frontend.html \
+              -J zap-frontend.json \
+              -I
+
+      # ── ZAP Baseline — API Establecimientos ──────────────────────────────
+      - name: "DAST · ZAP Baseline — API Establecimientos"
+        env:
+          NODE_IP: ${{ steps.node.outputs.ip }}
+        run: |
+          docker run --rm \
+            --network host \
+            -v /tmp/zap-reports:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "http://${NODE_IP}:30081" \
+              -r zap-establecimientos.html \
+              -J zap-establecimientos.json \
+              -I
+
+      # ── ZAP Baseline — API Movimientos ────────────────────────────────────
+      - name: "DAST · ZAP Baseline — API Movimientos"
+        env:
+          NODE_IP: ${{ steps.node.outputs.ip }}
+        run: |
+          docker run --rm \
+            --network host \
+            -v /tmp/zap-reports:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "http://${NODE_IP}:30082" \
+              -r zap-movimientos.html \
+              -J zap-movimientos.json \
+              -I
+
+      # ── Subir reportes como artefacto (siempre, incluso si ZAP falla) ────
+      - name: Subir reportes DAST
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-dast-reports-${{ github.sha }}
+          path: /tmp/zap-reports/
+          retention-days: 30
