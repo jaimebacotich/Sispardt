@@ -1,0 +1,115 @@
+# ============================================================
+# SISPARDT — CI Pipeline
+# Runner: ubuntu-latest (GitHub-hosted, no requiere runner propio)
+#
+# Etapas:
+#   1. Secrets scan     — Gitleaks
+#   2. SAST Go          — gosec (establecimientos, movimientos,
+#                         kafka-consumer, auditoria-sesiones)
+#   3. SAST Semgrep     — Go + TypeScript
+#   4. Quality/SCA      — ESLint (bloquea) + npm audit (informativo)
+#
+# Trigger: push a main
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── 1. Secrets Scan — Gitleaks ────────────────────────────────────────────
+  secrets-scan:
+    name: "Security · Secrets Scan (Gitleaks)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ejecutar Gitleaks
+        run: |
+          GITLEAKS_VERSION="8.18.4"
+          wget -q https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+          tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz gitleaks
+          ./gitleaks detect --source . --verbose
+          rm -f gitleaks gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+
+  # ─── 2. SAST — gosec (servicios Go) ────────────────────────────────────────
+  sast-go:
+    name: "Security · SAST Go (gosec)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+
+      - name: Instalar gosec y analizar servicios Go
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -fmt=text ./services/establecimientos/...
+          gosec -fmt=text ./services/movimientos/...
+          gosec -fmt=text ./services/kafka-consumer/...
+          gosec -fmt=text ./services/auditoria-sesiones/...
+
+  # ─── 3. SAST — Semgrep (Go + TypeScript) ───────────────────────────────────
+  sast-semgrep:
+    name: "Security · SAST Semgrep (Go + TypeScript)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Semgrep — servicios Go
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            semgrep/semgrep:latest \
+            semgrep --config=p/golang \
+              --error \
+              /src/services/establecimientos \
+              /src/services/movimientos \
+              /src/services/kafka-consumer \
+              /src/services/auditoria-sesiones
+
+      - name: Semgrep — frontend TypeScript
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            semgrep/semgrep:latest \
+            semgrep --config=p/typescript \
+              --error \
+              /src/frontend/src
+
+  # ─── 4. Calidad + Audit — frontend ─────────────────────────────────────────
+  dependency-audit:
+    name: "Quality · ESLint + Dependency Audit (npm)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias, lint y auditar
+        run: |
+          cd frontend
+          npm ci --ignore-scripts --legacy-peer-deps
+          # Análisis de calidad — bloquea ante errores ESLint
+          npm run lint
+          # Auditoría de dependencias — informativo
+          npm audit --legacy-peer-deps || true
