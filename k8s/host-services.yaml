@@ -88,6 +88,31 @@ subsets:
         port: 8080
 
 ---
+# ─── db-auditoria-sesiones ────────────────────────────────────────────────────
+# Nota: Docker Compose expone db-auditoria-sesiones en host port 5435
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-auditoria-sesiones
+  namespace: sispardt
+spec:
+  ports:
+    - name: pg
+      port: 5432
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: db-auditoria-sesiones
+  namespace: sispardt
+subsets:
+  - addresses:
+      - ip: ${NODE_IP}
+    ports:
+      - name: pg
+        port: 5435
+
+---
 # ─── kafka ────────────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: Service

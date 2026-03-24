@@ -17,15 +17,18 @@
 #
 # SECRETS requeridos en GitHub → Settings → Secrets → Actions:
 #
-#   ENV_FILE           Contenido completo del archivo .env (nunca commitear el .env)
-#   GHCR_PAT           Personal Access Token con scope read:packages y write:packages
-#   APP_PASS_ADMIN     Contraseña del usuario PostgreSQL app_admin
-#   APP_PASS_RECEP     Contraseña del usuario PostgreSQL app_recepcionista
-#   APP_PASS_ESTAD     Contraseña del usuario PostgreSQL app_resp_estadistica
-#   KC_SECRET_EST_SVC  Keycloak client secret — sispardt-establecimientos-svc
-#   KC_SECRET_MOV_SVC  Keycloak client secret — sispardt-movimientos-svc
-#   NEXTAUTH_SECRET    NextAuth session secret (mínimo 32 caracteres)
-#   DEFAULT_USER_PASSWORD  Contraseña inicial temporal para usuarios creados desde Personal
+#   ENV_FILE              Contenido completo del archivo .env (nunca commitear el .env)
+#   GHCR_PAT              Personal Access Token con scope read:packages y write:packages
+#   APP_PASS_RESP_REG     Contraseña del usuario PostgreSQL app_responsable_registro (establecimientos)
+#   APP_PASS_RECEP        Contraseña del usuario PostgreSQL app_recepcionista (movimientos)
+#   APP_PASS_ESTAD        Contraseña del usuario PostgreSQL app_resp_estadistica (movimientos)
+#   APP_PASS_ADMIN        Contraseña del usuario PostgreSQL app_admin_general (movimientos)
+#   APP_PASS_AUD_SES      Contraseña del usuario PostgreSQL app_auditoria_sesiones
+#   KC_SECRET_EST_SVC     Keycloak client secret — sispardt-establecimientos-svc
+#   KC_SECRET_MOV_SVC     Keycloak client secret — sispardt-movimientos-svc
+#   KC_SECRET_AUD_SVC     Keycloak client secret — sispardt-auditoria-sesiones-svc
+#   NEXTAUTH_SECRET       NextAuth session secret (mínimo 32 caracteres)
+#   DEFAULT_USER_PASSWORD Contraseña inicial temporal para usuarios creados desde Personal
 #
 # NOTA: sispardt-web es cliente público en Keycloak (sin secret).
 # ============================================================
@@ -168,6 +171,8 @@ jobs:
             context: services/movimientos
           - service: kafka-consumer
             context: services/kafka-consumer
+          - service: auditoria-sesiones
+            context: services/auditoria-sesiones
           - service: frontend
             context: frontend
 
@@ -203,12 +208,12 @@ jobs:
           exit-code: "1"          # bloquea ante CVEs críticos en la imagen final
 
       - name: Login a ghcr.io
-        if: github.ref == 'refs/heads/main'
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           echo "${{ secrets.GHCR_PAT }}" | docker login $REGISTRY -u ${{ github.actor }} --password-stdin
 
-      - name: Push imagen (solo en main)
-        if: github.ref == 'refs/heads/main'
+      - name: Push imagen (solo en tag)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           docker push $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:${{ github.sha }}
           docker push $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:latest
@@ -217,7 +222,7 @@ jobs:
   deploy:
     name: "Deploy → k3s"
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: self-hosted
 
     steps:
@@ -235,14 +240,14 @@ jobs:
         # (evita conflicto de puerto 80 entre Traefik Docker y Traefik k3s)
         run: |
           docker compose -f $GITHUB_WORKSPACE/docker-compose.yml up -d --remove-orphans \
-            db-establecimientos db-movimientos db-keycloak keycloak keycloak-init \
+            db-establecimientos db-movimientos db-auditoria-sesiones db-keycloak keycloak keycloak-init \
             kafka debezium kafka-ui kafka-init svc-kafka-consumer \
             prometheus grafana node-exporter postgres-exporter-est postgres-exporter-mov
 
       - name: Esperar que la infraestructura esté healthy
         run: |
           echo "Esperando que los servicios críticos estén healthy..."
-          for svc in sispardt-db-establecimientos sispardt-db-movimientos sispardt-keycloak; do
+          for svc in sispardt-db-establecimientos sispardt-db-movimientos sispardt-db-auditoria-sesiones sispardt-keycloak; do
             echo -n "  → $svc: "
             for i in $(seq 1 30); do
               STATUS=$(docker inspect --format='{{.State.Health.Status}}' $svc 2>/dev/null || echo "missing")
@@ -339,6 +344,7 @@ jobs:
           MOV_DSN="postgresql://app_recepcionista:${{ secrets.APP_PASS_RECEP }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           MOV_STATS_DSN="postgresql://app_resp_estadistica:${{ secrets.APP_PASS_ESTAD }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           KC_DSN="postgresql://app_admin_general:${{ secrets.APP_PASS_ADMIN }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
+          AUD_SES_DSN="postgresql://app_auditoria_sesiones:${{ secrets.APP_PASS_AUD_SES }}@db-auditoria-sesiones:5432/sispardt_auditoria_sesiones?sslmode=disable"
 
           kubectl create secret generic sispardt-secrets \
             --namespace=sispardt \
@@ -346,8 +352,10 @@ jobs:
             --from-literal=MOV_DB_DSN="${MOV_DSN}" \
             --from-literal=MOV_DB_DSN_STATS="${MOV_STATS_DSN}" \
             --from-literal=KC_CONSUMER_DB_DSN="${KC_DSN}" \
+            --from-literal=AUD_SES_DB_DSN="${AUD_SES_DSN}" \
             --from-literal=KC_SECRET_EST=${{ secrets.KC_SECRET_EST_SVC }} \
             --from-literal=KC_SECRET_MOV=${{ secrets.KC_SECRET_MOV_SVC }} \
+            --from-literal=KC_SECRET_AUD=${{ secrets.KC_SECRET_AUD_SVC }} \
             --from-literal=NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} \
             --from-literal=AUTH_KEYCLOAK_SECRET="" \
             --from-literal=DEFAULT_USER_PASSWORD=${{ secrets.DEFAULT_USER_PASSWORD }} \
@@ -359,7 +367,7 @@ jobs:
           IMAGE_OWNER: ${{ github.repository_owner }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          for dir in k8s/establecimientos k8s/movimientos k8s/frontend; do
+          for dir in k8s/establecimientos k8s/movimientos k8s/auditoria-sesiones k8s/frontend; do
             envsubst '${IMAGE_OWNER} ${IMAGE_TAG}' < ${dir}/deployment.yaml | kubectl apply -f -
           done
 
@@ -368,15 +376,17 @@ jobs:
         run: |
           kubectl apply -f k8s/establecimientos/service.yaml
           kubectl apply -f k8s/movimientos/service.yaml
+          kubectl apply -f k8s/auditoria-sesiones/service.yaml
           kubectl apply -f k8s/frontend/service.yaml
           kubectl apply -f k8s/ingress.yaml
 
       # ── Verificar rollouts ────────────────────────────────────────────────────
       - name: Verificar rollouts
         run: |
-          kubectl rollout status deployment/svc-establecimientos -n sispardt --timeout=5m
-          kubectl rollout status deployment/svc-movimientos      -n sispardt --timeout=5m
-          kubectl rollout status deployment/svc-frontend         -n sispardt --timeout=5m
+          kubectl rollout status deployment/svc-establecimientos     -n sispardt --timeout=5m
+          kubectl rollout status deployment/svc-movimientos          -n sispardt --timeout=5m
+          kubectl rollout status deployment/svc-auditoria-sesiones   -n sispardt --timeout=5m
+          kubectl rollout status deployment/svc-frontend             -n sispardt --timeout=5m
 
       # ── Smoke Test — validación HTTP post-deploy ─────────────────────────────
       - name: "Smoke Test · Validar endpoints críticos"
@@ -399,9 +409,11 @@ jobs:
           }
 
           # Microservicio establecimientos — endpoint de salud
-          check "svc-establecimientos /health" "http://${NODE_IP}:30081/health" "200"
+          check "svc-establecimientos /health"   "http://${NODE_IP}:30081/health" "200"
           # Microservicio movimientos — endpoint de salud
-          check "svc-movimientos /health"      "http://${NODE_IP}:30082/health" "200"
+          check "svc-movimientos /health"        "http://${NODE_IP}:30082/health" "200"
+          # Microservicio auditoria-sesiones — endpoint de salud
+          check "svc-auditoria-sesiones /health" "http://${NODE_IP}:30084/health" "200"
           # Frontend — página principal (responde 200 o 307 redirect)
           STATUS=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 15 "http://${NODE_IP}" || echo "000")
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "307" ] || [ "$STATUS" = "302" ]; then
@@ -429,7 +441,7 @@ jobs:
   dast:
     name: "Security · DAST (OWASP ZAP Baseline)"
     needs: deploy
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: self-hosted
 
     steps:
@@ -493,6 +505,21 @@ jobs:
               -t "http://${NODE_IP}:30082" \
               -r zap-movimientos.html \
               -J zap-movimientos.json \
+              -I
+
+      # ── ZAP Baseline — API Auditoria Sesiones ─────────────────────────────
+      - name: "DAST · ZAP Baseline — API Auditoria Sesiones"
+        env:
+          NODE_IP: ${{ steps.node.outputs.ip }}
+        run: |
+          docker run --rm \
+            --network host \
+            -v /tmp/zap-reports:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "http://${NODE_IP}:30084" \
+              -r zap-auditoria-sesiones.html \
+              -J zap-auditoria-sesiones.json \
               -I
 
       # ── Subir reportes como artefacto (siempre, incluso si ZAP falla) ────

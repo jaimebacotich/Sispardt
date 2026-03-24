@@ -68,6 +68,26 @@ spec:
           port: 8081
 
 ---
+# ─── Auditoria Sesiones ───────────────────────────────────────────────────────
+# Prioridad 15: por encima de /api/v1/auditoria (establecimientos, prio 10)
+# para evitar que el prefijo más corto lo capture primero.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sispardt-auditoria-sesiones
+  namespace: sispardt
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: PathPrefix(`/api/v1/auditoria-sesiones`)
+      priority: 15
+      services:
+        - name: svc-auditoria-sesiones
+          port: 8084
+
+---
 # ─── Frontend (catch-all) ─────────────────────────────────────────────────────
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
