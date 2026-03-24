@@ -76,7 +76,8 @@ db_script_local/establecimientos.sql
 db_script_local/movimientos.sql
 
 # Mocks de desarrollo
-frontend/src/lib/mocks.ts
+# mocks.ts se commitea porque useMovimientos.ts lo importa estáticamente
+# (webpack debe resolverlo en build aunque NEXT_PUBLIC_MOCK_API=false)
 frontend/src/lib/mock-catalogos.ts
 
 # Herramientas de desarrollo local
