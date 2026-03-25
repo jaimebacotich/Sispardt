@@ -304,7 +304,20 @@ jobs:
 
       # ── Namespace ─────────────────────────────────────────────────────────────
       - name: Aplicar namespace
-        run: kubectl apply -f k8s/namespace.yaml
+        run: |
+          # Esperar a que desaparezca si está en Terminating (puede tardar hasta ~60s)
+          for i in $(seq 1 30); do
+            STATUS=$(kubectl get namespace sispardt -o jsonpath='{.status.phase}' 2>/dev/null || echo "gone")
+            if [ "$STATUS" = "Terminating" ]; then
+              echo "  namespace sispardt en Terminating, esperando... ($i/30)"
+              sleep 5
+            else
+              break
+            fi
+          done
+          kubectl apply -f k8s/namespace.yaml
+          # Confirmar que está Active antes de continuar
+          kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/sispardt --timeout=60s
 
       # ── Secret para pull de ghcr.io desde k3s ────────────────────────────────
       - name: Crear/actualizar imagePullSecret (ghcr-cred)
