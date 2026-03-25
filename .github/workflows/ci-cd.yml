@@ -238,15 +238,19 @@ jobs:
       - name: Levantar infraestructura (Docker Compose)
         # Solo infraestructura — los servicios de app los maneja k3s exclusivamente
         # (evita conflicto de puerto 80 entre Traefik Docker y Traefik k3s)
+        # || true: Keycloak puede fallar su healthcheck en el primer intento (JVM lenta);
+        # el step siguiente espera activamente y falla si no llega a healthy.
         run: |
           docker compose -f $GITHUB_WORKSPACE/docker-compose.yml up -d --remove-orphans \
             db-establecimientos db-movimientos db-auditoria-sesiones db-keycloak keycloak keycloak-init \
             kafka debezium kafka-ui kafka-init svc-kafka-consumer \
-            prometheus grafana node-exporter postgres-exporter-est postgres-exporter-mov
+            prometheus grafana node-exporter postgres-exporter-est postgres-exporter-mov \
+            || true
 
       - name: Esperar que la infraestructura esté healthy
         run: |
           echo "Esperando que los servicios críticos estén healthy..."
+          FAILED=0
           for svc in sispardt-db-establecimientos sispardt-db-movimientos sispardt-db-auditoria-sesiones sispardt-keycloak; do
             echo -n "  → $svc: "
             for i in $(seq 1 30); do
@@ -256,11 +260,27 @@ jobs:
                 break
               fi
               if [ $i -eq 30 ]; then
-                echo "timeout (último estado: $STATUS)"
+                echo "TIMEOUT (último estado: $STATUS)"
+                FAILED=1
               fi
               sleep 10
             done
           done
+
+          # Diagnóstico en caso de fallo de Keycloak
+          KC_STATUS=$(docker inspect --format='{{.State.Health.Status}}' sispardt-keycloak 2>/dev/null || echo "missing")
+          if [ "$KC_STATUS" != "healthy" ]; then
+            echo ""
+            echo "=== LOGS sispardt-keycloak (últimas 100 líneas) ==="
+            docker logs --tail 100 sispardt-keycloak 2>&1 || true
+            echo "=== Estado del contenedor ==="
+            docker inspect --format='ExitCode={{.State.ExitCode}} Status={{.State.Status}} Error={{.State.Error}}' sispardt-keycloak 2>/dev/null || true
+          fi
+
+          if [ $FAILED -eq 1 ]; then
+            echo "ERROR: Uno o más servicios no alcanzaron estado healthy"
+            exit 1
+          fi
 
       # ── Verificar y recuperar conector Debezium ──────────────────────────────
       - name: Verificar conector Debezium
