@@ -132,22 +132,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Instalar dependencias, lint y auditar
         run: |
-          # Agregar node embebido del runner al PATH (excluir versiones alpine, incompatibles con glibc)
-          for d in "$HOME/Termi/actions-runner/externals"*/node*/bin; do
-            echo "$d" | grep -q "alpine" && continue
-            [ -d "$d" ] && [ -x "$d/node" ] && export PATH=$PATH:$d && echo "node encontrado: $d" && break
-          done
-          # Intentar nvm como alternativa
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-          # Fallback rutas del sistema
-          if ! command -v node &>/dev/null; then
-            for p in /usr/bin /usr/local/bin /snap/bin; do
-              [ -x "$p/node" ] && export PATH=$PATH:$p && break
-            done
-          fi
           node --version
           npm --version
           cd frontend && npm ci --ignore-scripts --legacy-peer-deps
