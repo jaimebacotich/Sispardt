@@ -1,0 +1,186 @@
+# ============================================================
+# SISPARDT - Docker Compose: Capa de Base de Datos + Keycloak
+# Levanta: BD Establecimientos, BD Movimientos, BD Keycloak, Keycloak
+# Uso: docker compose -f docker-compose.db.yml up -d
+# ============================================================
+
+name: sispardt-db
+
+services:
+
+  # ----------------------------------------------------------
+  # BD Establecimientos
+  # Contiene: establecimientos, habitaciones, personal, geo
+  # CDC via Debezium: publicacion pardt_establecimientos_pub
+  # ----------------------------------------------------------
+  db-establecimientos:
+    build:
+      context: ./infrastructure/docker/postgres
+      dockerfile: Dockerfile
+      args:
+        PGPARTMAN_VERSION: "5.2.0"
+    image: sispardt/postgres:17.2-alpine
+    container_name: sispardt-db-establecimientos
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       sispardt_establecimientos
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_EST:?Variable POSTGRES_PASSWORD_EST requerida}
+      LOAD_TEST_DATA:    ${LOAD_TEST_DATA:-false}
+      APP_PASS_ADMIN:    ${APP_PASS_ADMIN:?Variable APP_PASS_ADMIN requerida}
+      APP_PASS_RESP_REG: ${APP_PASS_RESP_REG:?Variable APP_PASS_RESP_REG requerida}
+      APP_PASS_TEC_REG:  ${APP_PASS_TEC_REG:?Variable APP_PASS_TEC_REG requerida}
+      APP_PASS_RECEP:    ${APP_PASS_RECEP:?Variable APP_PASS_RECEP requerida}
+      APP_PASS_ESTAD:    ${APP_PASS_ESTAD:?Variable APP_PASS_ESTAD requerida}
+      APP_PASS_DEBEZIUM: ${APP_PASS_DEBEZIUM:?Variable APP_PASS_DEBEZIUM requerida}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-est-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./infrastructure/docker/postgres/init-establecimientos.sh:/docker-entrypoint-scripts/do-init.sh:ro
+      - ./db_script_local/scripts/establecimientos:/docker-entrypoint-scripts/establecimientos:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    ports:
+      - "${PORT_DB_EST:-5432}:5432"
+    networks:
+      - sispardt-db-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d sispardt_establecimientos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # ----------------------------------------------------------
+  # BD Movimientos
+  # Contiene: partes_diarios, cierres, personas, replica_cache
+  # CDC via Debezium: publicacion pardt_movimiento_pub
+  # Patron Outbox: outbox_events
+  # ----------------------------------------------------------
+  db-movimientos:
+    build:
+      context: ./infrastructure/docker/postgres
+      dockerfile: Dockerfile
+      args:
+        PGPARTMAN_VERSION: "5.2.0"
+    image: sispardt/postgres:17.2-alpine
+    container_name: sispardt-db-movimientos
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       sispardt_movimientos
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_MOV:?Variable POSTGRES_PASSWORD_MOV requerida}
+      LOAD_TEST_DATA:    ${LOAD_TEST_DATA:-false}
+      APP_PASS_ADMIN:    ${APP_PASS_ADMIN:?Variable APP_PASS_ADMIN requerida}
+      APP_PASS_RESP_REG: ${APP_PASS_RESP_REG:?Variable APP_PASS_RESP_REG requerida}
+      APP_PASS_RECEP:    ${APP_PASS_RECEP:?Variable APP_PASS_RECEP requerida}
+      APP_PASS_ESTAD:    ${APP_PASS_ESTAD:?Variable APP_PASS_ESTAD requerida}
+      APP_PASS_DEBEZIUM: ${APP_PASS_DEBEZIUM:?Variable APP_PASS_DEBEZIUM requerida}
+      APP_PASS_KAFKA:    ${APP_PASS_KAFKA:?Variable APP_PASS_KAFKA requerida}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-mov-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./infrastructure/docker/postgres/init-movimientos.sh:/docker-entrypoint-scripts/do-init.sh:ro
+      - ./db_script_local/scripts/movimientos:/docker-entrypoint-scripts/movimientos:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    ports:
+      - "${PORT_DB_MOV:-5433}:5432"
+    networks:
+      - sispardt-db-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d sispardt_movimientos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # ----------------------------------------------------------
+  # BD Keycloak
+  # ----------------------------------------------------------
+  db-keycloak:
+    image: postgres:17.2-alpine
+    container_name: sispardt-db-keycloak
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       keycloak
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_KC:?Variable POSTGRES_PASSWORD_KC requerida}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-kc-data:/var/lib/postgresql/data
+    ports:
+      - "${PORT_DB_KC:-5434}:5432"
+    networks:
+      - sispardt-db-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ----------------------------------------------------------
+  # Keycloak 26.4 (imagen ya descargada en Docker Desktop)
+  # Modo desarrollo: HTTP habilitado, sin TLS
+  # ----------------------------------------------------------
+  keycloak:
+    image: keycloak/keycloak:26.4
+    container_name: sispardt-keycloak
+    restart: unless-stopped
+    # start-dev: modo desarrollo (HTTP, sin TLS)
+    # --import-realm: importa realm-sispardt.json si el realm no existe
+    command: start-dev --import-realm
+    environment:
+      KC_DB:                   postgres
+      KC_DB_URL:               jdbc:postgresql://db-keycloak:5432/keycloak
+      KC_DB_USERNAME:          ${POSTGRES_USER:-postgres}
+      KC_DB_PASSWORD:          ${POSTGRES_PASSWORD_KC}
+      KEYCLOAK_ADMIN:          ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Variable KEYCLOAK_ADMIN_PASSWORD requerida}
+      KC_HOSTNAME:             localhost
+      KC_HTTP_ENABLED:         "true"
+      KC_HEALTH_ENABLED:       "true"
+      KC_METRICS_ENABLED:      "true"
+      # Secrets de clientes (leidos por init-realm.sh si cambian del valor dev)
+      KC_SECRET_EST_SVC:       ${KC_SECRET_EST_SVC:-svc-establecimientos-secret-dev}
+      KC_SECRET_MOV_SVC:       ${KC_SECRET_MOV_SVC:-svc-movimientos-secret-dev}
+    volumes:
+      # Realm JSON para importacion automatica al primer arranque
+      - ./infrastructure/keycloak/realm-sispardt.json:/opt/keycloak/data/import/realm-sispardt.json:ro
+      # Script de post-init (ejecutar manualmente o via CI: docker exec sispardt-keycloak bash /scripts/init-realm.sh)
+      - ./infrastructure/keycloak/init-realm.sh:/scripts/init-realm.sh:ro
+    ports:
+      - "${KC_HTTP_PORT:-8080}:8080"
+      - "${KC_MANAGEMENT_PORT:-9000}:9000"
+    networks:
+      - sispardt-db-net
+    depends_on:
+      db-keycloak:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak 26.x no incluye curl/wget, usamos /dev/tcp de bash
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/9000 && echo -e \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+# ----------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------
+volumes:
+  pg-est-data:
+    name: sispardt-pg-est-data
+  pg-mov-data:
+    name: sispardt-pg-mov-data
+  pg-kc-data:
+    name: sispardt-pg-kc-data
+
+# ----------------------------------------------------------
+# Networks
+# ----------------------------------------------------------
+networks:
+  sispardt-db-net:
+    name: sispardt-db-net
+    driver: bridge

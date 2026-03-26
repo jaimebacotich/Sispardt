@@ -1,0 +1,296 @@
+package handler
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
+
+	"sispardt/movimientos/internal/auth"
+	"sispardt/movimientos/internal/domain"
+	"sispardt/movimientos/internal/service"
+)
+
+// ─── Catálogos ────────────────────────────────────────────────────────────────
+
+type CatalogosHandler struct{ svc *service.ParteDiarioService }
+
+func NewCatalogosHandler(svc *service.ParteDiarioService) *CatalogosHandler {
+	return &CatalogosHandler{svc: svc}
+}
+
+func (h *CatalogosHandler) List(w http.ResponseWriter, r *http.Request) {
+	cat, err := h.svc.GetCatalogos(r.Context())
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "error al obtener catálogos")
+		return
+	}
+	jsonOK(w, cat)
+}
+
+// ─── Partes Diarios ───────────────────────────────────────────────────────────
+
+type ParteDiarioHandler struct{ svc *service.ParteDiarioService }
+
+func NewParteDiarioHandler(svc *service.ParteDiarioService) *ParteDiarioHandler {
+	return &ParteDiarioHandler{svc: svc}
+}
+
+func (h *ParteDiarioHandler) List(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	params := domain.ListPartesParams{
+		Page:            parseIntQuery(r, "page", 1),
+		PageSize:        parseIntQuery(r, "page_size", 20),
+		FechaDesde:      r.URL.Query().Get("fecha_desde"),
+		FechaHasta:      r.URL.Query().Get("fecha_hasta"),
+		FechaReporte:    r.URL.Query().Get("fecha_reporte"),
+		HabitacionID:    r.URL.Query().Get("habitacion_id"),
+		SoloActivos:     r.URL.Query().Get("solo_activos") == "true",
+		SoloCheckout:    r.URL.Query().Get("solo_checkout") == "true",
+		EstadoOperativo: r.URL.Query().Get("estado_operativo"),
+		IncluirAnulados: r.URL.Query().Get("incluir_anulados") == "true",
+		SalidaFecha:     r.URL.Query().Get("salida_fecha"),
+		ActivoEnFecha:   r.URL.Query().Get("activo_en_fecha"),
+	}
+	if claims.HasRole(auth.RoleRecepcionista) {
+		params.EstablecimientoID = claims.EstablecimientoID
+	} else {
+		params.EstablecimientoID = r.URL.Query().Get("establecimiento_id")
+	}
+	result, err := h.svc.List(r.Context(), params)
+	if err != nil {
+		log.Error().Err(err).Interface("params", params).Msg("error al listar partes")
+		jsonError(w, http.StatusInternalServerError, "error al listar partes: "+err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+func (h *ParteDiarioHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	estID := claims.EstablecimientoID
+	if estID == "" {
+		estID = r.URL.Query().Get("establecimiento_id")
+	}
+	id := chi.URLParam(r, "id")
+	parte, err := h.svc.GetByID(r.Context(), id, estID)
+	if err != nil {
+		log.Error().Err(err).Str("id", id).Str("establecimiento_id", estID).Msg("error al obtener parte")
+		jsonError(w, http.StatusInternalServerError, "error al obtener parte")
+		return
+	}
+	if parte == nil {
+		jsonError(w, http.StatusNotFound, "parte diario no encontrado")
+		return
+	}
+	jsonOK(w, parte)
+}
+
+func (h *ParteDiarioHandler) Create(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	if claims == nil {
+		log.Error().Msg("Claims no encontrados en el contexto")
+		jsonError(w, http.StatusUnauthorized, "sesión no encontrada")
+		return
+	}
+
+	if claims.EstablecimientoID == "" {
+		jsonError(w, http.StatusForbidden, "recepcionista sin establecimiento asignado")
+		return
+	}
+	var req domain.CreateParteDiarioRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
+		return
+	}
+	result, err := h.svc.Create(r.Context(), claims.Sub, r.RemoteAddr, claims.EstablecimientoID, req)
+	if err != nil {
+		log.Error().Err(err).Str("sub", claims.Sub).Msg("Error al crear parte diario")
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonCreated(w, result)
+}
+
+func (h *ParteDiarioHandler) Checkout(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	id := chi.URLParam(r, "id")
+	result, err := h.svc.Checkout(r.Context(), id, claims.Sub, r.RemoteAddr, claims.EstablecimientoID)
+	if err != nil {
+		if err.Error() == "parte diario no encontrado" {
+			jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+func (h *ParteDiarioHandler) Anular(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	id := chi.URLParam(r, "id")
+	if err := h.svc.Anular(r.Context(), id, claims.Sub, r.RemoteAddr, claims.EstablecimientoID); err != nil {
+		if err.Error() == "parte diario no encontrado" {
+			jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonNoContent(w)
+}
+
+func (h *ParteDiarioHandler) EstadoHabitaciones(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	estID := claims.EstablecimientoID
+	if estID == "" {
+		estID = r.URL.Query().Get("establecimiento_id")
+	}
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
+		return
+	}
+	fecha := r.URL.Query().Get("fecha")
+	result, err := h.svc.GetHabitacionesEstado(r.Context(), estID, fecha)
+	if err != nil {
+		log.Error().Err(err).Str("establecimiento_id", estID).Msg("error al obtener estado de habitaciones")
+		jsonError(w, http.StatusInternalServerError, "error al obtener estado de habitaciones: "+err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+// ─── Cierres Diarios ──────────────────────────────────────────────────────────
+
+type CierreDiarioHandler struct{ svc *service.ParteDiarioService }
+
+func NewCierreDiarioHandler(svc *service.ParteDiarioService) *CierreDiarioHandler {
+	return &CierreDiarioHandler{svc: svc}
+}
+
+func (h *CierreDiarioHandler) Create(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	if claims.EstablecimientoID == "" {
+		jsonError(w, http.StatusForbidden, "sin establecimiento asignado")
+		return
+	}
+	var req domain.CreateCierreDiarioRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
+		return
+	}
+	result, err := h.svc.CreateCierre(r.Context(), claims.Sub, claims.Sub, r.RemoteAddr, claims.EstablecimientoID, req)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonCreated(w, result)
+}
+
+func (h *CierreDiarioHandler) List(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	estID := claims.EstablecimientoID
+	if estID == "" {
+		estID = r.URL.Query().Get("establecimiento_id")
+	}
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
+		return
+	}
+	result, err := h.svc.ListCierres(r.Context(), estID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "error al listar cierres")
+		return
+	}
+	jsonOK(w, result)
+}
+
+func (h *CierreDiarioHandler) Pendientes(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	estID := claims.EstablecimientoID
+	if estID == "" {
+		estID = r.URL.Query().Get("establecimiento_id")
+	}
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
+		return
+	}
+	result, err := h.svc.GetFechasPendientes(r.Context(), estID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "error al obtener fechas pendientes")
+		return
+	}
+	jsonOK(w, result)
+}
+
+func (h *CierreDiarioHandler) GetByFecha(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	fecha := chi.URLParam(r, "fecha")
+	estID := claims.EstablecimientoID
+	if estID == "" {
+		estID = r.URL.Query().Get("establecimiento_id")
+	}
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
+		return
+	}
+	result, err := h.svc.GetCierrePorFecha(r.Context(), estID, fecha)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "error al obtener cierre")
+		return
+	}
+	if result == nil {
+		jsonError(w, http.StatusNotFound, "cierre no encontrado para esa fecha")
+		return
+	}
+	jsonOK(w, result)
+}
+
+// ─── Estadísticas ─────────────────────────────────────────────────────────────
+
+type EstadisticasHandler struct{ svc *service.ParteDiarioService }
+
+func NewEstadisticasHandler(svc *service.ParteDiarioService) *EstadisticasHandler {
+	return &EstadisticasHandler{svc: svc}
+}
+
+func (h *EstadisticasHandler) OcupacionDiaria(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	estID := r.URL.Query().Get("establecimiento_id")
+	if claims.HasRole(auth.RoleRecepcionista) {
+		estID = claims.EstablecimientoID
+	}
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
+		return
+	}
+	desde := r.URL.Query().Get("fecha_desde")
+	hasta := r.URL.Query().Get("fecha_hasta")
+	if desde == "" || hasta == "" {
+		jsonError(w, http.StatusBadRequest, "fecha_desde y fecha_hasta son requeridas")
+		return
+	}
+	result, err := h.svc.OcupacionDiaria(r.Context(), estID, desde, hasta)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+func parseIntQuery(r *http.Request, key string, fallback int) int {
+	v := r.URL.Query().Get(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
+}
