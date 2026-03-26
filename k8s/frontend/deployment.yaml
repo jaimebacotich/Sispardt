@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-frontend
+  namespace: sispardt
+  labels:
+    app: svc-frontend
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: svc-frontend
+  template:
+    metadata:
+      labels:
+        app: svc-frontend
+    spec:
+      imagePullSecrets:
+        - name: ghcr-cred
+      containers:
+        - name: svc-frontend
+          image: ghcr.io/${IMAGE_OWNER}/sispardt-frontend:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          # Variables runtime (Next.js las lee en el servidor, no son build-time)
+          env:
+            # ── NextAuth ──────────────────────────────────────────────────────
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: NEXTAUTH_URL
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: NEXTAUTH_SECRET
+            # ── Keycloak OIDC ─────────────────────────────────────────────────
+            - name: AUTH_KEYCLOAK_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: AUTH_KEYCLOAK_ID
+            - name: AUTH_KEYCLOAK_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: AUTH_KEYCLOAK_ISSUER
+            - name: AUTH_KEYCLOAK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: AUTH_KEYCLOAK_SECRET
+            # ── URLs internas (SSR → microservicios) ──────────────────────────
+            - name: API_ESTABLECIMIENTOS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: API_ESTABLECIMIENTOS_URL
+            - name: API_MOVIMIENTOS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: API_MOVIMIENTOS_URL
+            # ── Configuración pública (cliente browser) ───────────────────────
+            - name: NEXT_PUBLIC_API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: NEXT_PUBLIC_API_BASE_URL
+            - name: NEXT_PUBLIC_INICIO_SISTEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: NEXT_PUBLIC_INICIO_SISTEMA
+            - name: NEXT_PUBLIC_PAIS_DEFECTO
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: NEXT_PUBLIC_PAIS_DEFECTO
+            - name: NEXT_PUBLIC_DIVISION_PRINCIPAL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: NEXT_PUBLIC_DIVISION_PRINCIPAL
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi

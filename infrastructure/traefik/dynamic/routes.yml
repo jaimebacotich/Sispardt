@@ -1,0 +1,66 @@
+http:
+  routers:
+    establecimientos:
+      rule: "PathPrefix(`/api/v1/establecimientos`) || PathPrefix(`/api/v1/geo`) || (PathPrefix(`/api/v1/auditoria`) && !PathPrefix(`/api/v1/auditoria-sesiones`)) || (PathPrefix(`/api/v1/catalogos`) && !PathPrefix(`/api/v1/catalogos/movimientos`))"
+      service: establecimientos
+      entryPoints:
+        - web
+
+    catalogos-movimientos:
+      rule: "Path(`/api/v1/catalogos/movimientos`)"
+      service: movimientos
+      entryPoints:
+        - web
+      priority: 100
+
+    movimientos:
+      rule: "PathPrefix(`/api/v1/partes`) || PathPrefix(`/api/v1/cierres`) || PathPrefix(`/api/v1/estadisticas`) || PathPrefix(`/api/v1/personas`) || PathPrefix(`/api/v1/movimientos`)"
+      service: movimientos
+      entryPoints:
+        - web
+
+    sistema:
+      rule: "PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`) || PathPrefix(`/api/v1/sistema`)"
+      service: svc-sistema
+      middlewares:
+        - sistema-ratelimit
+      entryPoints:
+        - web
+      priority: 200
+
+    frontend:
+      rule: "PathPrefix(`/`)"
+      service: svc-frontend
+      entryPoints:
+        - web
+      priority: 1
+
+  middlewares:
+    sistema-ratelimit:
+      rateLimit:
+        average: 20
+        burst: 5
+
+  services:
+    establecimientos:
+      loadBalancer:
+        servers:
+          - url: "http://svc-establecimientos:8081"
+
+    movimientos:
+      loadBalancer:
+        servers:
+          - url: "http://svc-movimientos:8082"
+
+    svc-sistema:
+      loadBalancer:
+        servers:
+          - url: "http://svc-sistema:8085"
+        healthCheck:
+          path: /health
+          interval: 15s
+
+    svc-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://svc-frontend:3000"

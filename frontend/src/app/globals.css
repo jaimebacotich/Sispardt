@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet map styles */
+@import "leaflet/dist/leaflet.css";
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  /* ============================================================
+   * SISPARDT — Paleta corporativa (HSL triplets para Tailwind v3)
+   * Primary:  Teal  #0D9488  → hsl(173 80% 32%)
+   * Secondary: Blue #2563EB  → hsl(221 83% 53%)
+   * ============================================================ */
+  :root {
+    --background:              210 40% 98%;    /* #f8fafc slate-50  */
+    --foreground:              222 47% 11%;    /* #0f172a slate-900 */
+    --card:                    0 0% 100%;      /* #ffffff           */
+    --card-foreground:         222 47% 11%;
+    --popover:                 0 0% 100%;
+    --popover-foreground:      222 47% 11%;
+    --primary:                 173 80% 32%;    /* #0d9488 teal-600  */
+    --primary-foreground:      210 20% 98%;    /* #f9fafb           */
+    --secondary:               221 83% 53%;    /* #2563eb blue-600  */
+    --secondary-foreground:    210 20% 98%;
+    --muted:                   210 40% 96%;    /* #f1f5f9 slate-100 */
+    --muted-foreground:        215 16% 47%;    /* #64748b slate-500 */
+    --accent:                  166 76% 97%;    /* #f0fdfa teal-50   */
+    --accent-foreground:       173 70% 26%;    /* #0f766e teal-700  */
+    --destructive:             0 84% 60%;      /* #ef4444 red-500   */
+    --border:                  214 32% 91%;    /* #e2e8f0 slate-200 */
+    --input:                   214 32% 91%;
+    --ring:                    173 80% 32%;    /* teal-600          */
+    /* Charts — hex directo (no necesitan opacity modifier) */
+    --chart-1: #10b981;
+    --chart-2: #2563eb;
+    --chart-3: #7c3aed;
+    --chart-4: #d97706;
+    --chart-5: #ef4444;
+    --radius: 0.625rem;
+    /* Sidebar — modo claro */
+    --sidebar:                 0 0% 100%;      /* #ffffff blanco    */
+    --sidebar-foreground:      215 25% 27%;    /* #334155 slate-700 */
+    --sidebar-primary:         173 80% 32%;    /* #0d9488 teal-600  */
+    --sidebar-primary-foreground: 0 0% 100%;  /* blanco sobre teal */
+    --sidebar-accent:          210 40% 96%;    /* #f1f5f9 slate-100 */
+    --sidebar-accent-foreground: 215 28% 17%; /* #1e293b slate-800 */
+    --sidebar-border:          214 32% 91%;    /* #e2e8f0 slate-200 */
+    --sidebar-ring:            173 80% 32%;
+  }
+
+  .dark {
+    --background:              215 28% 17%;    /* #1e293b slate-800 */
+    --foreground:              210 40% 96%;    /* #f1f5f9 slate-100 */
+    --card:                    215 25% 22%;    /* entre slate-800 y 700 */
+    --card-foreground:         210 40% 96%;
+    --popover:                 215 25% 22%;
+    --popover-foreground:      210 40% 96%;
+    --primary:                 173 80% 40%;    /* #14b8a6 teal-500  */
+    --primary-foreground:      215 28% 12%;
+    --secondary:               215 19% 35%;    /* #475569 slate-600 */
+    --secondary-foreground:    210 40% 96%;
+    --muted:                   215 25% 27%;    /* #334155 slate-700 */
+    --muted-foreground:        213 27% 65%;    /* slate-400         */
+    --accent:                  215 25% 27%;
+    --accent-foreground:       210 40% 96%;
+    --destructive:             0 91% 71%;      /* #f87171 red-400   */
+    --border:                  215 25% 27%;    /* #334155 slate-700 */
+    --input:                   215 19% 35%;    /* #475569 slate-600 */
+    --ring:                    173 80% 40%;
+    /* Charts dark */
+    --chart-1: #34d399;
+    --chart-2: #60a5fa;
+    --chart-3: #a78bfa;
+    --chart-4: #fbbf24;
+    --chart-5: #f87171;
+    /* Sidebar dark */
+    --sidebar:                 215 25% 13%;    /* slate-850 aprox   */
+    --sidebar-foreground:      213 27% 84%;    /* #cbd5e1 slate-300 */
+    --sidebar-primary:         173 80% 40%;    /* #14b8a6 teal-500  */
+    --sidebar-primary-foreground: 215 28% 12%;
+    --sidebar-accent:          215 28% 17%;    /* #1e293b slate-800 */
+    --sidebar-accent-foreground: 213 27% 84%;
+    --sidebar-border:          215 25% 22%;
+    --sidebar-ring:            173 80% 40%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  /* Scrollbar personalizado */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.4);
+  }
+}
+
+/* ── Sub-tabs Catálogos: tab activo con fondo verde (primary) ──── */
+.catalogos-subtabs [data-slot="tabs-trigger"][data-active] {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-color: transparent !important;
+  border-radius: calc(var(--radius) - 2px) !important;
+}
+.catalogos-subtabs [data-slot="tabs-trigger"][data-active]::after {
+  opacity: 0 !important;
+}
+
+/* ── Print styles para Estadísticas ───────────────────────────── */
+@media print {
+  /* Forzar colores exactos (fondos, gráficos SVG) */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Evitar cortes dentro de las tarjetas y gráficos */
+  .bg-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ── KPI cards: escala proporcional ─────────────────────────── */
+  .print-kpi-grid {
+    zoom: 0.78;
+  }
+
+  /* ── Chart cards: escala proporcional (zoom afecta layout Y visual) ─ */
+  /* Recharts renderiza SVG con tamaños calculados en JS.               */
+  /* zoom escala TODO el elemento incluyendo el SVG sin desplazamiento. */
+  .print-chart-card {
+    zoom: 0.62;
+  }
+
+  @page {
+    size: 216mm 279mm; /* Carta / Letter — vertical */
+    margin: 6mm 8mm 2mm 8mm; /* top right bottom left — margen inferior mínimo */
+  }
+}

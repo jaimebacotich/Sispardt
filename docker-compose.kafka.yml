@@ -1,0 +1,171 @@
+# ============================================================
+# SISPARDT - Docker Compose: Mensajería + CDC
+# Kafka (KRaft, sin Zookeeper) + Debezium + Kafka UI + Consumer
+#
+# Uso:
+#   docker compose -f docker-compose.kafka.yml up -d
+#
+# Prerequisito: docker-compose.db.yml debe estar corriendo.
+# Después de levantar, registrar el conector Debezium:
+#   bash infrastructure/kafka/register-connectors.sh
+# ============================================================
+
+name: sispardt-kafka
+
+services:
+
+  # ----------------------------------------------------------
+  # Apache Kafka 3.9 — modo KRaft (sin Zookeeper)
+  # Puerto 9092: acceso interno entre contenedores
+  # Puerto 9094: acceso desde el host (herramientas locales)
+  # ----------------------------------------------------------
+  kafka:
+    image: bitnami/kafka:3.9
+    container_name: sispardt-kafka
+    restart: unless-stopped
+    environment:
+      # KRaft — broker + controller en un solo nodo
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+
+      # Listeners: interno (Docker) + externo (host)
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+
+      # Configuración para single-node (dev)
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      # Retención de mensajes (7 días — suficiente para replay)
+      KAFKA_CFG_LOG_RETENTION_HOURS: "168"
+      KAFKA_CFG_LOG_RETENTION_BYTES: "-1"
+
+      # Tamaño máximo de mensaje (para payloads grandes de Debezium)
+      KAFKA_CFG_MESSAGE_MAX_BYTES: "10485760"   # 10MB
+      KAFKA_CFG_REPLICA_FETCH_MAX_BYTES: "10485760"
+    volumes:
+      - kafka-data:/bitnami/kafka
+    ports:
+      - "9092:9092"
+      - "${KAFKA_EXTERNAL_PORT:-9094}:9094"
+    networks:
+      - sispardt-db-net
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------
+  # Kafka UI — consola web para topics, mensajes y consumer groups
+  # Puerto 8091 (8080 Keycloak, 8090 Traefik dashboard)
+  # ----------------------------------------------------------
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: sispardt-kafka-ui
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: sispardt
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://debezium:8083
+    ports:
+      - "${KAFKA_UI_PORT:-8091}:8080"
+    networks:
+      - sispardt-db-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # ----------------------------------------------------------
+  # Debezium Kafka Connect — CDC desde PostgreSQL
+  # Puerto 8083: REST API para gestión de conectores
+  # Conector: PostgreSQL → Kafka (WAL logical replication)
+  # ----------------------------------------------------------
+  debezium:
+    image: quay.io/debezium/connect:3.0
+    container_name: sispardt-debezium
+    restart: unless-stopped
+    environment:
+      # Conexión a Kafka
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium-connect-group
+
+      # Topics de configuración interna de Kafka Connect
+      CONFIG_STORAGE_TOPIC: debezium.connect.configs
+      OFFSET_STORAGE_TOPIC: debezium.connect.offsets
+      STATUS_STORAGE_TOPIC: debezium.connect.status
+      CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      STATUS_STORAGE_REPLICATION_FACTOR: "1"
+
+      # Converters — JSON sin schema registry (más simple)
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+
+      # Heartbeat para mantener el slot de replicación activo
+      HEARTBEAT_INTERVAL_MS: "5000"
+
+      # Credenciales del conector (expuestas vía variables de entorno)
+      DEBEZIUM_DB_PASSWORD: ${APP_PASS_DEBEZIUM}
+    ports:
+      - "${DEBEZIUM_PORT:-8083}:8083"
+    networks:
+      - sispardt-db-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/connectors || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ----------------------------------------------------------
+  # Kafka Consumer — sincroniza replica_cache en movimientos
+  # Lee cambios de establecimientos vía Kafka y los aplica
+  # al schema de movimientos (consistencia eventual)
+  # ----------------------------------------------------------
+  svc-kafka-consumer:
+    build:
+      context: ./services/kafka-consumer
+      dockerfile: Dockerfile
+    image: sispardt/svc-kafka-consumer:latest
+    container_name: sispardt-kafka-consumer
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKERS:   "kafka:9092"
+      KAFKA_GROUP_ID:  "sispardt-replica-consumer"
+      DB_DSN:          "postgres://app_kafka_consumer:${APP_PASS_KAFKA}@db-movimientos:5432/sispardt_movimientos?sslmode=disable&pool_max_conns=10"
+      LOG_LEVEL:       "${LOG_LEVEL:-info}"
+      ENV:             "${ENV:-development}"
+    networks:
+      - sispardt-db-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+# ----------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------
+volumes:
+  kafka-data:
+    name: sispardt-kafka-data
+
+# ----------------------------------------------------------
+# Red compartida con los demás stacks
+# ----------------------------------------------------------
+networks:
+  sispardt-db-net:
+    external: true
+    name: sispardt-db-net

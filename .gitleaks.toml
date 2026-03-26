@@ -1,0 +1,22 @@
+# ============================================================
+# SISPARDT — Configuración Gitleaks
+# Allowlist de falsos positivos documentados
+# ============================================================
+
+title = "gitleaks config"
+
+[allowlist]
+  description = "Falsos positivos conocidos en scripts de seed y ejemplos"
+
+  # db_script_local/seed-estadisticas.sh usa UUIDs ficticios con patron
+  # eaaa????-5eed-5eed-5eed-???????????? donde '5eed' es 'seed' en hex.
+  # Gitleaks los detecta como 'square-access-token' por su entropía y formato.
+  # Estos valores NO son credenciales reales.
+  paths = [
+    '''db_script_local/seed-estadisticas\.sh'''
+  ]
+
+  # Regex adicional para el patrón de UUID ficticio de seed, por si aparece en otros archivos
+  regexes = [
+    '''[0-9a-f]{4}[0-9a-f]{4}-5eed-5eed-5eed-[0-9a-f]{12}'''
+  ]

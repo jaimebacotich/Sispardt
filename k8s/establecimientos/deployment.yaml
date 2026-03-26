@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-establecimientos
+  namespace: sispardt
+  labels:
+    app: svc-establecimientos
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: svc-establecimientos
+  template:
+    metadata:
+      labels:
+        app: svc-establecimientos
+    spec:
+      imagePullSecrets:
+        - name: ghcr-cred
+      containers:
+        - name: svc-establecimientos
+          # ${IMAGE_OWNER} y ${IMAGE_TAG} son sustituidos por envsubst en el deploy
+          image: ghcr.io/${IMAGE_OWNER}/sispardt-establecimientos:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: PORT
+              value: "8081"
+            - name: DB_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: EST_DB_DSN
+            - name: KEYCLOAK_JWKS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_JWKS_URL
+            - name: KEYCLOAK_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_ISSUER
+            - name: KEYCLOAK_ADMIN_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_ADMIN_URL
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_REALM
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: KC_SECRET_EST
+            - name: DEFAULT_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: DEFAULT_USER_PASSWORD
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

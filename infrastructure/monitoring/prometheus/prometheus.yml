@@ -1,0 +1,69 @@
+# ============================================================
+# SISPARDT - Prometheus scrape configuration
+# Sistema completo con CI/CD OK1
+# ============================================================
+
+global:
+  scrape_interval:     5s
+  evaluation_interval: 5s
+  scrape_timeout:      4s
+  external_labels:
+    sistema: sispardt
+    ambiente: development
+
+# No hay reglas de alertas por ahora (se agregan en rules/)
+rule_files: []
+
+scrape_configs:
+
+  # --- Prometheus mismo ---
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # --- Traefik API Gateway ---
+  # Traefik expone métricas en el puerto de management (:8080 interno)
+  - job_name: traefik
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    metrics_path: /metrics
+
+  # --- Microservicio Establecimientos (k8s NodePort) ---
+  - job_name: svc-establecimientos
+    static_configs:
+      - targets: ['host.docker.internal:30081']
+    metrics_path: /metrics
+
+  # --- Microservicio Movimientos (k8s NodePort) ---
+  - job_name: svc-movimientos
+    static_configs:
+      - targets: ['host.docker.internal:30082']
+    metrics_path: /metrics
+
+  # --- PostgreSQL Exporter — BD Establecimientos ---
+  - job_name: postgres-establecimientos
+    static_configs:
+      - targets: ['postgres-exporter-est:9187']
+    relabel_configs:
+      - target_label: instancia
+        replacement: establecimientos
+
+  # --- PostgreSQL Exporter — BD Movimientos ---
+  - job_name: postgres-movimientos
+    static_configs:
+      - targets: ['postgres-exporter-mov:9187']
+    relabel_configs:
+      - target_label: instancia
+        replacement: movimientos
+
+  # --- Node Exporter (métricas del host) ---
+  - job_name: node
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # --- Keycloak (expone métricas en :9000/metrics) ---
+  - job_name: keycloak
+    static_configs:
+      - targets: ['keycloak:9000']
+    metrics_path: /metrics
+    # Keycloak usa formato Prometheus nativo desde v22+

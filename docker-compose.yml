@@ -1,0 +1,690 @@
+# ============================================================
+# SISPARDT - Docker Compose Unificado
+# Levanta todo el sistema con: docker compose up -d
+# svc-movimientos corre con 2 réplicas automáticamente (deploy.replicas: 2)
+#
+# Puertos expuestos:
+#   80    → API Gateway (Traefik)
+#   3100  → Frontend Next.js
+#   8080  → Keycloak
+#   8083  → Debezium REST API
+#   8090  → Traefik Dashboard
+#   8091  → Kafka UI
+#   9000  → Keycloak Metrics
+#   9090  → Prometheus
+#   9092  → Kafka (interno)
+#   9094  → Kafka (host)
+#   3000  → Grafana
+#   5432  → BD Establecimientos
+#   5433  → BD Movimientos
+#   5434  → BD Keycloak
+# ============================================================
+
+name: sispardt
+
+services:
+
+  # ============================================================
+  # CAPA DE BASE DE DATOS
+  # ============================================================
+
+  db-establecimientos:
+    build:
+      context: ./infrastructure/docker/postgres
+      dockerfile: Dockerfile
+      args:
+        PGPARTMAN_VERSION: "5.2.0"
+    image: sispardt/postgres:17.2-alpine
+    container_name: sispardt-db-establecimientos
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       sispardt_establecimientos
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_EST:?Variable POSTGRES_PASSWORD_EST requerida}
+      APP_PASS_ADMIN:    ${APP_PASS_ADMIN:?Variable APP_PASS_ADMIN requerida}
+      APP_PASS_RESP_REG: ${APP_PASS_RESP_REG:?Variable APP_PASS_RESP_REG requerida}
+      APP_PASS_TEC_REG:  ${APP_PASS_TEC_REG:?Variable APP_PASS_TEC_REG requerida}
+      APP_PASS_RECEP:    ${APP_PASS_RECEP:?Variable APP_PASS_RECEP requerida}
+      APP_PASS_ESTAD:    ${APP_PASS_ESTAD:?Variable APP_PASS_ESTAD requerida}
+      APP_PASS_DEBEZIUM: ${APP_PASS_DEBEZIUM:?Variable APP_PASS_DEBEZIUM requerida}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-est-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init-establecimientos.sh:/docker-entrypoint-scripts/do-init.sh:ro
+      - ./db_script_local/scripts/establecimientos:/docker-entrypoint-scripts/establecimientos:ro
+    ports:
+      - "${PORT_DB_EST:-5432}:5432"
+    networks:
+      - sispardt-net
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d sispardt_establecimientos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  db-movimientos:
+    build:
+      context: ./infrastructure/docker/postgres
+      dockerfile: Dockerfile
+      args:
+        PGPARTMAN_VERSION: "5.2.0"
+    image: sispardt/postgres:17.2-alpine
+    container_name: sispardt-db-movimientos
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       sispardt_movimientos
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_MOV:?Variable POSTGRES_PASSWORD_MOV requerida}
+      APP_PASS_ADMIN:    ${APP_PASS_ADMIN:?Variable APP_PASS_ADMIN requerida}
+      APP_PASS_RESP_REG: ${APP_PASS_RESP_REG:?Variable APP_PASS_RESP_REG requerida}
+      APP_PASS_RECEP:    ${APP_PASS_RECEP:?Variable APP_PASS_RECEP requerida}
+      APP_PASS_ESTAD:    ${APP_PASS_ESTAD:?Variable APP_PASS_ESTAD requerida}
+      APP_PASS_DEBEZIUM: ${APP_PASS_DEBEZIUM:?Variable APP_PASS_DEBEZIUM requerida}
+      APP_PASS_KAFKA:    ${APP_PASS_KAFKA:?Variable APP_PASS_KAFKA requerida}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-mov-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init-movimientos.sh:/docker-entrypoint-scripts/do-init.sh:ro
+      - ./db_script_local/scripts/movimientos:/docker-entrypoint-scripts/movimientos:ro
+    ports:
+      - "${PORT_DB_MOV:-5433}:5432"
+    networks:
+      - sispardt-net
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d sispardt_movimientos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  db-sistema:
+    build:
+      context: ./infrastructure/docker/postgres
+      dockerfile: Dockerfile
+      args:
+        PGPARTMAN_VERSION: "5.2.0"
+    image: sispardt/postgres:17.2-alpine
+    container_name: sispardt-db-sistema
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       sispardt_sistema
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_SISTEMA:?Variable POSTGRES_PASSWORD_SISTEMA requerida}
+      APP_PASS_SISTEMA:  ${APP_PASS_SISTEMA:?Variable APP_PASS_SISTEMA requerida}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-sistema-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init-sistema.sh:/docker-entrypoint-scripts/do-init.sh:ro
+      - ./db_script_local/scripts/sistema:/docker-entrypoint-scripts/sistema:ro
+    ports:
+      - "${PORT_DB_SISTEMA:-5435}:5432"
+    networks:
+      - sispardt-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d sispardt_sistema"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  db-keycloak:
+    image: postgres:17.2-alpine
+    container_name: sispardt-db-keycloak
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       keycloak
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_KC:?Variable POSTGRES_PASSWORD_KC requerida}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-kc-data:/var/lib/postgresql/data
+    ports:
+      - "${PORT_DB_KC:-5434}:5432"
+    networks:
+      - sispardt-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ============================================================
+  # KEYCLOAK
+  # ============================================================
+
+  keycloak:
+    image: keycloak/keycloak:26.4
+    container_name: sispardt-keycloak
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KC_DB:                   postgres
+      KC_DB_URL:               jdbc:postgresql://db-keycloak:5432/keycloak
+      KC_DB_USERNAME:          ${POSTGRES_USER:-postgres}
+      KC_DB_PASSWORD:          ${POSTGRES_PASSWORD_KC}
+      KEYCLOAK_ADMIN:          ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Variable KEYCLOAK_ADMIN_PASSWORD requerida}
+      KC_HOSTNAME:             ${APP_HOST:-localhost}
+      KC_HTTP_ENABLED:         "true"
+      KC_HEALTH_ENABLED:       "true"
+      KC_METRICS_ENABLED:      "true"
+    ports:
+      - "${KC_HTTP_PORT:-8080}:8080"
+      - "${KC_MANAGEMENT_PORT:-9000}:9000"
+    networks:
+      - sispardt-net
+    depends_on:
+      db-keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/9000 && echo -e \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && grep -q UP <&3'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  keycloak-init:
+    image: keycloak/keycloak:26.4
+    container_name: sispardt-keycloak-init
+    restart: "no"
+    entrypoint: [ "/bin/bash", "-c" ]
+    command: [ "tr -d '\r' < /scripts/init-keycloak.sh > /tmp/init.sh && bash /tmp/init.sh" ]
+    environment:
+      KC_HOST:                 keycloak
+      KC_PORT:                 8080
+      KEYCLOAK_ADMIN:          ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Variable KEYCLOAK_ADMIN_PASSWORD requerida}
+      KEYCLOAK_REALM:          ${KEYCLOAK_REALM:-sispardt}
+      SISPARDT_USER_PASSWORD:  ${SISPARDT_USER_PASSWORD:?Variable SISPARDT_USER_PASSWORD requerida}
+      KC_SECRET_EST_SVC:          ${KC_SECRET_EST_SVC:?Variable KC_SECRET_EST_SVC requerida}
+      KC_SECRET_MOV_SVC:          ${KC_SECRET_MOV_SVC:?Variable KC_SECRET_MOV_SVC requerida}
+      KC_SECRET_SISTEMA_SVC:      ${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}
+      KC_SECRET_AUD_SVC:          ${KC_SECRET_AUD_SVC:?Variable KC_SECRET_AUD_SVC requerida}
+      APP_HOST:                   ${APP_HOST:-localhost}
+      APP_PORT:                   ${APP_PORT:-3100}
+      KC_ADMIN_USERNAME:          ${KC_ADMIN_USERNAME:-admin.sispardt}
+      KC_ADMIN_NOMBRE:            ${KC_ADMIN_NOMBRE:-Admin}
+      KC_ADMIN_APELLIDO:          ${KC_ADMIN_APELLIDO:-SISPARDT}
+      KC_RESP_USERNAME:           ${KC_RESP_USERNAME:-resp.registro}
+      KC_RESP_NOMBRE:             ${KC_RESP_NOMBRE:-Responsable}
+      KC_RESP_APELLIDO:           ${KC_RESP_APELLIDO:-Registro}
+      KC_TEC_USERNAME:            ${KC_TEC_USERNAME:-tec.registro}
+      KC_TEC_NOMBRE:              ${KC_TEC_NOMBRE:-Tecnico}
+      KC_TEC_APELLIDO:            ${KC_TEC_APELLIDO:-Registro}
+    volumes:
+      - ./infrastructure/keycloak/init-keycloak.sh:/scripts/init-keycloak.sh:ro
+    networks:
+      - sispardt-net
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+
+  # ============================================================
+  # API GATEWAY
+  # ============================================================
+
+  traefik:
+    image: traefik:v3.3
+    container_name: sispardt-traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--ping=true"
+      - "--accesslog=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic/routes.yml"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entrypoint=traefik"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infrastructure/traefik/dynamic:/etc/traefik/dynamic:ro
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_DASHBOARD_PORT:-8090}:8080"
+    networks:
+      - sispardt-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================
+  # MICROSERVICIOS
+  # ============================================================
+
+  svc-establecimientos:
+    build:
+      context: ./services/establecimientos
+      dockerfile: Dockerfile
+    image: sispardt/svc-establecimientos:latest
+    container_name: sispardt-svc-establecimientos
+    restart: unless-stopped
+    environment:
+      PORT:              "8081"
+      DB_DSN:            "postgres://app_responsable_registro:${APP_PASS_RESP_REG}@db-establecimientos:5432/sispardt_establecimientos?sslmode=disable&pool_max_conns=20"
+      KEYCLOAK_JWKS_URL: "${KEYCLOAK_JWKS_URL_INTERNAL:-http://keycloak:8080/realms/sispardt/protocol/openid-connect/certs}"
+      KEYCLOAK_ISSUER:   "http://${APP_HOST:-localhost}:${KC_HTTP_PORT:-8080}/realms/sispardt"
+      LOG_LEVEL:         "${LOG_LEVEL:-info}"
+      ENV:               "${ENV:-development}"
+      # Keycloak Admin API (para crear usuarios recepcionista desde Personal)
+      KEYCLOAK_ADMIN_URL:     "http://keycloak:8080"
+      KEYCLOAK_REALM:         "${KEYCLOAK_REALM:-sispardt}"
+      KEYCLOAK_CLIENT_ID:     "sispardt-establecimientos-svc"
+      KEYCLOAK_CLIENT_SECRET: "${KC_SECRET_EST_SVC}"
+      DEFAULT_USER_PASSWORD:  "${DEFAULT_USER_PASSWORD:?Variable DEFAULT_USER_PASSWORD requerida}"
+    networks:
+      - sispardt-net
+    depends_on:
+      db-establecimientos:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.establecimientos.rule=PathPrefix(`/api/v1/establecimientos`) || PathPrefix(`/api/v1/geo`) || PathPrefix(`/api/v1/auditoria`) || (PathPrefix(`/api/v1/catalogos`) && !Path(`/api/v1/catalogos/movimientos`))"
+      - "traefik.http.routers.establecimientos.entrypoints=web"
+      - "traefik.http.routers.establecimientos.priority=10"
+      - "traefik.http.services.establecimientos.loadbalancer.server.port=8081"
+      - "traefik.http.services.establecimientos.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.establecimientos.loadbalancer.healthcheck.interval=15s"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  svc-movimientos:
+    build:
+      context: ./services/movimientos
+      dockerfile: Dockerfile
+    image: sispardt/svc-movimientos:latest
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+    environment:
+      PORT:              "8082"
+      DB_DSN:            "postgres://app_recepcionista:${APP_PASS_RECEP}@db-movimientos:5432/sispardt_movimientos?sslmode=disable&pool_max_conns=15"
+      DB_DSN_STATS:      "postgres://app_resp_estadistica:${APP_PASS_ESTAD}@db-movimientos:5432/sispardt_movimientos?sslmode=disable&pool_max_conns=5"
+      KEYCLOAK_JWKS_URL: "${KEYCLOAK_JWKS_URL_INTERNAL:-http://keycloak:8080/realms/sispardt/protocol/openid-connect/certs}"
+      KEYCLOAK_ISSUER:   "http://${APP_HOST:-localhost}:${KC_HTTP_PORT:-8080}/realms/sispardt"
+      KEYCLOAK_ADMIN_URL:     "http://keycloak:8080"
+      KEYCLOAK_REALM:         "${KEYCLOAK_REALM:-sispardt}"
+      KEYCLOAK_CLIENT_ID:     "sispardt-movimientos-svc"
+      KEYCLOAK_CLIENT_SECRET: "${KC_SECRET_MOV_SVC}"
+      LOG_LEVEL:           "debug"
+      ENV:                 "${ENV:-development}"
+    networks:
+      - sispardt-net
+    depends_on:
+      db-movimientos:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.movimientos.rule=PathPrefix(`/api/v1/partes`) || PathPrefix(`/api/v1/cierres`) || PathPrefix(`/api/v1/estadisticas`) || PathPrefix(`/api/v1/movimientos`)"
+      - "traefik.http.routers.movimientos.entrypoints=web"
+      - "traefik.http.services.movimientos.loadbalancer.server.port=8082"
+      - "traefik.http.services.movimientos.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.movimientos.loadbalancer.healthcheck.interval=15s"
+      - "traefik.http.services.movimientos.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.movimientos.loadbalancer.sticky.cookie.name=sispardt_lb"
+      - "traefik.http.services.movimientos.loadbalancer.sticky.cookie.httpOnly=true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  svc-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: sispardt/svc-frontend:latest
+    container_name: sispardt-svc-frontend
+    restart: unless-stopped
+    environment:
+      NEXTAUTH_URL:                "http://${APP_HOST:-localhost}:${APP_PORT:-3100}"
+      NEXTAUTH_SECRET:             "${NEXTAUTH_SECRET:?Variable NEXTAUTH_SECRET requerida}"
+      AUTH_TRUST_HOST:             "true"
+      AUTH_KEYCLOAK_ID:            "sispardt-web"
+      AUTH_KEYCLOAK_SECRET:        ""
+      AUTH_KEYCLOAK_ISSUER:        "http://${APP_HOST:-localhost}:${KC_HTTP_PORT:-8080}/realms/sispardt"
+      AUTH_KEYCLOAK_INTERNAL:      "http://keycloak:8080/realms/sispardt"
+      NEXT_PUBLIC_KC_PORT:         "${KC_HTTP_PORT:-8080}"
+      API_ESTABLECIMIENTOS_URL:    "http://traefik:80"
+      API_MOVIMIENTOS_URL:         "http://traefik:80"
+    ports:
+      - "${APP_PORT:-3100}:3000"
+    networks:
+      - sispardt-net
+    depends_on:
+      traefik:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.routers.frontend.priority=1"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+
+  svc-sistema:
+    build:
+      context: ./services/sistema
+      dockerfile: Dockerfile
+    image: sispardt/svc-sistema:latest
+    container_name: sispardt-svc-sistema
+    restart: unless-stopped
+    environment:
+      PORT:                  "8085"
+      DB_DSN:                "postgres://app_sistema:${APP_PASS_SISTEMA}@db-sistema:5432/sispardt_sistema?sslmode=disable&pool_max_conns=10"
+      KEYCLOAK_JWKS_URL:     "${KEYCLOAK_JWKS_URL_INTERNAL:-http://keycloak:8080/realms/sispardt/protocol/openid-connect/certs}"
+      KEYCLOAK_ISSUER:       "http://${APP_HOST:-localhost}:${KC_HTTP_PORT:-8080}/realms/sispardt"
+      KEYCLOAK_ADMIN_URL:    "http://keycloak:8080"
+      KEYCLOAK_REALM:        "${KEYCLOAK_REALM:-sispardt}"
+      KC_CLIENT_ID:          "sispardt-sistema-svc"
+      KC_CLIENT_SECRET:      "${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}"
+      POLL_INTERVAL_SECONDS: "10"
+      LOG_LEVEL:             "${LOG_LEVEL:-info}"
+      ENV:                   "${ENV:-development}"
+    networks:
+      - sispardt-net
+    depends_on:
+      db-sistema:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sistema.rule=PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`) || PathPrefix(`/api/v1/sistema`)"
+      - "traefik.http.routers.sistema.entrypoints=web"
+      - "traefik.http.routers.sistema.priority=90"
+      - "traefik.http.routers.sistema.middlewares=sistema-ratelimit"
+      - "traefik.http.middlewares.sistema-ratelimit.ratelimit.average=20"
+      - "traefik.http.middlewares.sistema-ratelimit.ratelimit.burst=5"
+      - "traefik.http.services.sistema.loadbalancer.server.port=8085"
+      - "traefik.http.services.sistema.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.sistema.loadbalancer.healthcheck.interval=15s"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ============================================================
+  # MENSAJERÍA Y CDC (Kafka + Debezium)
+  # ============================================================
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: sispardt-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: "168"
+      KAFKA_LOG_RETENTION_BYTES: "-1"
+      KAFKA_MESSAGE_MAX_BYTES: "10485760"
+      KAFKA_REPLICA_FETCH_MAX_BYTES: "10485760"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    ports:
+      - "9092:9092"
+      - "${KAFKA_EXTERNAL_PORT:-9094}:9094"
+    networks:
+      - sispardt-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  debezium:
+    image: quay.io/debezium/connect:3.0
+    container_name: sispardt-debezium
+    restart: unless-stopped
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium-connect-group
+      CONFIG_STORAGE_TOPIC: debezium.connect.configs
+      OFFSET_STORAGE_TOPIC: debezium.connect.offsets
+      STATUS_STORAGE_TOPIC: debezium.connect.status
+      CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      HEARTBEAT_INTERVAL_MS: "5000"
+      DEBEZIUM_DB_PASSWORD: ${APP_PASS_DEBEZIUM}
+    ports:
+      - "${DEBEZIUM_PORT:-8083}:8083"
+    networks:
+      - sispardt-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+      db-establecimientos:
+        condition: service_healthy
+      db-movimientos:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/connectors || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: sispardt-kafka-ui
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: sispardt
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://debezium:8083
+    ports:
+      - "${KAFKA_UI_PORT:-8091}:8080"
+    networks:
+      - sispardt-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  svc-kafka-consumer:
+    build:
+      context: ./services/kafka-consumer
+      dockerfile: Dockerfile
+    image: sispardt/svc-kafka-consumer:latest
+    container_name: sispardt-kafka-consumer
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKERS:   "kafka:9092"
+      KAFKA_GROUP_ID:  "sispardt-replica-consumer-v4"
+      DB_DSN:          "postgres://app_kafka_consumer:${APP_PASS_KAFKA}@db-movimientos:5432/sispardt_movimientos?sslmode=disable&pool_max_conns=10"
+      LOG_LEVEL:       "${LOG_LEVEL:-info}"
+      ENV:             "${ENV:-development}"
+    networks:
+      - sispardt-net
+    depends_on:
+      kafka:
+        condition: service_healthy
+      db-movimientos:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+  kafka-init:
+    image: alpine:3.21
+    container_name: sispardt-kafka-init
+    restart: "no"
+    depends_on:
+      debezium:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["apk add --no-cache curl bash && tr -d '\\r' < /scripts/init-connectors.sh > /tmp/init.sh && bash /tmp/init.sh"]
+    environment:
+      APP_PASS_DEBEZIUM: ${APP_PASS_DEBEZIUM}
+      DEBEZIUM_URL:      "http://debezium:8083"
+    volumes:
+      - ./infrastructure/kafka/init-connectors.sh:/scripts/init-connectors.sh:ro
+      - ./infrastructure/kafka/debezium/connector-establecimientos.json:/scripts/connector-establecimientos.json:ro
+    networks:
+      - sispardt-net
+
+  # ============================================================
+  # OBSERVABILIDAD (Prometheus + Grafana)
+  # ============================================================
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: sispardt-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+      - --web.enable-lifecycle
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sispardt-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: sispardt-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER:          "${GRAFANA_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD:      "${GRAFANA_PASSWORD:?Variable GRAFANA_PASSWORD requerida}"
+      GF_USERS_ALLOW_SIGN_UP:          "false"
+      GF_SERVER_ROOT_URL:              "http://localhost:3000"
+      GF_ANALYTICS_REPORTING_ENABLED:  "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES:  "false"
+      GF_PATHS_PROVISIONING:           /etc/grafana/provisioning
+    volumes:
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - sispardt-net
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: sispardt-node-exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    networks:
+      - sispardt-net
+
+  postgres-exporter-est:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: sispardt-pg-exporter-est
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://app_resp_estadistica:${APP_PASS_ESTAD}@db-establecimientos:5432/sispardt_establecimientos?sslmode=disable"
+    networks:
+      - sispardt-net
+
+  postgres-exporter-mov:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: sispardt-pg-exporter-mov
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://app_resp_estadistica:${APP_PASS_ESTAD}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
+    networks:
+      - sispardt-net
+
+
+# ============================================================
+# VOLUMES
+# ============================================================
+volumes:
+  pg-est-data:
+    name: sispardt-pg-est-data
+  pg-mov-data:
+    name: sispardt-pg-mov-data
+  pg-kc-data:
+    name: sispardt-pg-kc-data
+  pg-sistema-data:
+    name: sispardt-pg-sistema-data
+  kafka-data:
+    name: sispardt-kafka-data
+  prometheus-data:
+    name: sispardt-prometheus-data
+  grafana-data:
+    name: sispardt-grafana-data
+
+# ============================================================
+# NETWORK
+# ============================================================
+networks:
+  sispardt-net:
+    name: sispardt-net
+    driver: bridge

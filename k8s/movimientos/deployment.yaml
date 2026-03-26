@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-movimientos
+  namespace: sispardt
+  labels:
+    app: svc-movimientos
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: svc-movimientos
+  template:
+    metadata:
+      labels:
+        app: svc-movimientos
+    spec:
+      imagePullSecrets:
+        - name: ghcr-cred
+      containers:
+        - name: svc-movimientos
+          image: ghcr.io/${IMAGE_OWNER}/sispardt-movimientos:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          env:
+            - name: PORT
+              value: "8082"
+            - name: DB_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: MOV_DB_DSN
+            - name: DB_DSN_STATS
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: MOV_DB_DSN_STATS
+            - name: KEYCLOAK_JWKS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_JWKS_URL
+            - name: KEYCLOAK_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: sispardt-config
+                  key: KEYCLOAK_ISSUER
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

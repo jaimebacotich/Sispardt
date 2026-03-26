@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-kafka-consumer
+  namespace: sispardt
+  labels:
+    app: svc-kafka-consumer
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: svc-kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: svc-kafka-consumer
+    spec:
+      imagePullSecrets:
+        - name: ghcr-cred
+      containers:
+        - name: svc-kafka-consumer
+          image: ghcr.io/${IMAGE_OWNER}/sispardt-kafka-consumer:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: sispardt-secrets
+                  key: KC_CONSUMER_DB_DSN
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
+            - name: KAFKA_GROUP_ID
+              value: "sispardt-replica-consumer-v4"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          # El consumer no expone HTTP — no hay probes de red
+          # k8s reinicia el pod si el proceso termina (restartPolicy: Always por defecto)

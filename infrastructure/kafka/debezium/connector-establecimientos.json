@@ -1,0 +1,44 @@
+{
+  "name": "sispardt-establecimientos-source",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+
+    "database.hostname": "db-establecimientos",
+    "database.port": "5432",
+    "database.user": "app_debezium",
+    "database.password": "${file:/kafka/secrets/debezium.properties:db.password}",
+    "database.dbname": "sispardt_establecimientos",
+    "database.server.name": "sispardt",
+
+    "topic.prefix": "sispardt",
+
+    "plugin.name": "pgoutput",
+    "publication.name": "pardt_establecimientos_pub",
+    "slot.name": "debezium_establecimientos_slot",
+
+    "table.include.list": "public.paises,public.divisiones_principales,public.divisiones_secundarias,public.localidades,public.establecimientos,public.tipo_camas,public.habitaciones,public.habitacion_camas,public.tipo_habitaciones",
+
+    "snapshot.mode": "initial",
+
+    "heartbeat.interval.ms": "10000",
+    "heartbeat.action.query": "UPDATE public.debezium_heartbeat SET ts = NOW() WHERE id = 1",
+
+    "decimal.handling.mode": "string",
+
+    "time.precision.mode": "connect",
+
+    "tombstones.on.delete": "false",
+
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+
+    "max.batch.size": "2048",
+    "poll.interval.ms": "1000",
+
+    "errors.tolerance": "none",
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true"
+  }
+}
