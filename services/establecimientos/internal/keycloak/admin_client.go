@@ -130,6 +130,9 @@ func (c *AdminClient) CreateUser(ctx context.Context, req CreateUserRequest) (st
 		return "", fmt.Errorf("crear usuario KC: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusConflict {
+		return "", fmt.Errorf("el nombre de usuario '%s' ya existe en el sistema", req.Username)
+	}
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("crear usuario KC: HTTP %d: %s", resp.StatusCode, string(respBody))

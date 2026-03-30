@@ -29,7 +29,7 @@ import {
 } from "@/hooks/useUsuariosSistema";
 import type { UsuarioSistema } from "@/types/api";
 
-const ROL_EXCLUIDO = "rol_recepcionista";
+const ROLES_PERMITIDOS = new Set(["rol_admin_general", "rol_responsable_registro", "rol_tecnico_registro"]);
 
 const schema = z.object({
   nombres: z.string().min(2, "Requerido").max(150),
@@ -47,7 +47,7 @@ interface Props {
 
 export function EditarUsuarioDialog({ usuario, onClose }: Props) {
   const { data: roles = [] } = useRolesSistema();
-  const rolesDisponibles = roles.filter((r) => r.nombre !== ROL_EXCLUIDO);
+  const rolesDisponibles = roles.filter((r) => ROLES_PERMITIDOS.has(r.nombre));
 
   const updateMut = useUpdateUsuarioSistema(usuario?.id ?? "");
   const rolMut = useCambiarRolUsuario(usuario?.id ?? "");
@@ -155,7 +155,11 @@ export function EditarUsuarioDialog({ usuario, onClose }: Props) {
               value={form.watch("rol_nombre")}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona un rol..." />
+                <SelectValue placeholder="Selecciona un rol...">
+                  {(rolesDisponibles.find((r) => r.nombre === form.watch("rol_nombre"))?.descripcion
+                    ?? form.watch("rol_nombre"))
+                    || "Selecciona un rol..."}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {rolesDisponibles.map((r) => (

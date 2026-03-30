@@ -16,7 +16,7 @@ import { FormField } from "@/components/shared/form-field";
 import { FormSelect } from "@/components/shared/form-select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Save, UserPlus, UserCog, ShieldCheck } from "lucide-react";
+import { Save, UserPlus, UserCog, ShieldCheck, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Personal, PersonalCreate, PersonalUpdate, TipoPersonal } from "@/types/api";
 
@@ -29,6 +29,7 @@ const schema = z.object({
   documentoIdentidad: z.string().optional(),
   telefono: z.string().optional(),
   usuarioSistema: z.boolean(),
+  username: z.string().max(100).regex(/^[a-z0-9._-]*$/, "Solo letras minúsculas, números, puntos, guiones").optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -59,10 +60,12 @@ export function PersonalSheet({
 
   const {
     control,
+    register,
     handleSubmit,
     reset,
     watch,
     setError,
+    formState,
     formState: { isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -73,16 +76,12 @@ export function PersonalSheet({
       documentoIdentidad: "",
       telefono: "",
       usuarioSistema: false,
+      username: "",
     },
   });
 
   const usuarioSistema = watch("usuarioSistema");
-  const documentoIdentidad = watch("documentoIdentidad");
-
-  // Username generado (solo informativo)
-  const usernamePreview = documentoIdentidad?.trim()
-    ? `recep.${documentoIdentidad.trim().toLowerCase()}`
-    : null;
+  const usernameValue = watch("username");
 
   useEffect(() => {
     if (!open) return;
@@ -95,6 +94,7 @@ export function PersonalSheet({
             documentoIdentidad: item.documentoIdentidad ?? "",
             telefono: item.telefono ?? "",
             usuarioSistema: item.usuarioSistema,
+            username: "",
           }
         : {
             nombres: "",
@@ -103,6 +103,7 @@ export function PersonalSheet({
             documentoIdentidad: "",
             telefono: "",
             usuarioSistema: false,
+            username: "",
           }
     );
   }, [open, item, reset]);
@@ -116,11 +117,16 @@ export function PersonalSheet({
       });
       return;
     }
-    if (data.usuarioSistema && !ci) {
-      setError("documentoIdentidad", {
-        message: "El documento de identidad es requerido para crear usuario de sistema",
-      });
-      return;
+    if (data.usuarioSistema && !yaEsUsuarioSistema) {
+      const usr = data.username?.trim() ?? "";
+      if (!usr) {
+        setError("username", { message: "El nombre de usuario es requerido" });
+        return;
+      }
+      if (usr.length < 5) {
+        setError("username", { message: "Mínimo 5 caracteres" });
+        return;
+      }
     }
     const safeData: PersonalCreate = {
       nombres: data.nombres.trim(),
@@ -129,6 +135,9 @@ export function PersonalSheet({
       documentoIdentidad: ci || undefined,
       telefono: data.telefono?.trim() || undefined,
       usuarioSistema: data.usuarioSistema,
+      username: (data.usuarioSistema && !yaEsUsuarioSistema)
+        ? data.username?.trim()
+        : undefined,
     };
     onSave(safeData);
   }
@@ -259,31 +268,38 @@ export function PersonalSheet({
               </div>
             </label>
 
-            {/* Vista previa del usuario a crear */}
+            {/* Campo username para nuevo usuario de sistema */}
             {usuarioSistema && !yaEsUsuarioSistema && (
-              <div className={cn(
-                "ml-7 rounded-lg border p-3 text-xs space-y-1",
-                usernamePreview
-                  ? "border-primary/30 bg-primary/5"
-                  : "border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20"
-              )}>
-                {usernamePreview ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Usuario:</span>
-                      <span className="font-mono font-semibold text-foreground">{usernamePreview}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Contraseña inicial:</span>
-                      <span className="font-mono text-muted-foreground">configurada por admin</span>
-                    </div>
-                    <p className="text-muted-foreground pt-1 border-t border-border/50">
-                      Al primer inicio de sesión se solicitará cambiar la contraseña.
-                    </p>
-                  </>
+              <div className="ml-7 space-y-1.5">
+                <label className="text-xs font-medium text-foreground flex items-center gap-1">
+                  Nombre de usuario
+                  <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  {...register("username")}
+                  placeholder="ej: recep.juanperez"
+                  autoComplete="off"
+                  className={cn(
+                    "h-8 text-sm font-mono",
+                    formState.errors.username ? "border-destructive" : ""
+                  )}
+                />
+                {formState.errors.username ? (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle size={11} />
+                    {formState.errors.username.message}
+                  </p>
+                ) : usernameValue?.trim() ? (
+                  <p className="text-xs text-muted-foreground">
+                    Se creará el acceso{" "}
+                    <span className="font-mono font-semibold text-foreground">
+                      {usernameValue.trim()}
+                    </span>
+                    . La contraseña se generará automáticamente.
+                  </p>
                 ) : (
-                  <p className="text-amber-700 dark:text-amber-400">
-                    Ingresa el CI para ver el usuario que se generará.
+                  <p className="text-xs text-orange-500">
+                    Solo letras minúsculas, números, puntos y guiones. Mínimo 5 caracteres.
                   </p>
                 )}
               </div>

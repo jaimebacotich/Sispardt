@@ -167,6 +167,8 @@ export interface Personal {
   activo: boolean;
   usuarioSistema: boolean;
   keycloakUserId?: string;
+  username?: string;
+  password_temporal?: string;
 }
 
 export interface PersonalCreate {
@@ -176,6 +178,7 @@ export interface PersonalCreate {
   documentoIdentidad?: string;
   telefono?: string;
   usuarioSistema: boolean;
+  username?: string;
 }
 
 export interface PersonalUpdate {
@@ -185,6 +188,7 @@ export interface PersonalUpdate {
   documentoIdentidad?: string;
   telefono?: string;
   usuarioSistema: boolean;
+  username?: string;
 }
 
 /* ============================================================

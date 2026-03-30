@@ -183,7 +183,8 @@ type PersonalResponse struct {
 	Activo             bool    `json:"activo"`
 	UsuarioSistema     bool    `json:"usuarioSistema"`
 	KeycloakUserID     *string `json:"keycloakUserId,omitempty"`
-	// PasswordTemporal se devuelve una única vez al crear la cuenta Keycloak.
+	// Username y PasswordTemporal se devuelven una única vez al crear la cuenta Keycloak.
+	Username         *string `json:"username,omitempty"`
 	PasswordTemporal *string `json:"password_temporal,omitempty"`
 }
 
@@ -194,6 +195,7 @@ type CreatePersonalRequest struct {
 	DocumentoIdentidad *string `json:"documentoIdentidad"`
 	Telefono           *string `json:"telefono"`
 	UsuarioSistema     bool    `json:"usuarioSistema"`
+	Username           string  `json:"username"`
 }
 
 type UpdatePersonalRequest struct {
@@ -203,6 +205,7 @@ type UpdatePersonalRequest struct {
 	DocumentoIdentidad *string `json:"documentoIdentidad"`
 	Telefono           *string `json:"telefono"`
 	UsuarioSistema     bool    `json:"usuarioSistema"`
+	Username           string  `json:"username"`
 }
 
 type TogglePersonalActivoRequest struct {

@@ -148,21 +148,22 @@ func (s *EstablecimientoService) CreatePersonal(ctx context.Context, userID, cli
 	// Si es usuario de sistema, crear en Keycloak ANTES de la tx DB
 	var kcUserID *string
 	var tempPass string
+	var kcUsername string
 	if req.UsuarioSistema {
 		if s.kcClient == nil {
 			return nil, fmt.Errorf("la integración con Keycloak no está configurada (KC_CLIENT_SECRET no definido)")
 		}
-		if req.DocumentoIdentidad == nil || *req.DocumentoIdentidad == "" {
-			return nil, fmt.Errorf("documento de identidad es requerido para crear usuario de sistema")
+		if req.Username == "" {
+			return nil, fmt.Errorf("nombre de usuario es requerido para crear usuario de sistema")
 		}
 		var err error
 		tempPass, err = utils.GenerateSecurePassword()
 		if err != nil {
 			return nil, fmt.Errorf("generar contraseña segura: %w", err)
 		}
-		username := "recep." + normalizeUsername(*req.DocumentoIdentidad)
+		kcUsername = req.Username
 		id, err := s.kcClient.CreateUser(ctx, keycloak.CreateUserRequest{
-			Username:          username,
+			Username:          kcUsername,
 			FirstName:         req.Nombres,
 			LastName:          req.Apellidos,
 			Password:          tempPass,
@@ -173,7 +174,7 @@ func (s *EstablecimientoService) CreatePersonal(ctx context.Context, userID, cli
 			return nil, fmt.Errorf("crear usuario en Keycloak: %w", err)
 		}
 		kcUserID = &id
-		log.Info().Str("username", username).Str("kc_user_id", id).Msg("usuario Keycloak creado")
+		log.Info().Str("username", kcUsername).Str("kc_user_id", id).Msg("usuario Keycloak creado")
 	}
 
 	var result *domain.PersonalResponse
@@ -192,6 +193,7 @@ func (s *EstablecimientoService) CreatePersonal(ctx context.Context, userID, cli
 		return nil, err
 	}
 	if tempPass != "" {
+		result.Username = &kcUsername
 		result.PasswordTemporal = &tempPass
 	}
 	return result, nil
@@ -208,6 +210,7 @@ func (s *EstablecimientoService) UpdatePersonal(ctx context.Context, userID, cli
 	// Verificar si necesita crear KC (nuevo usuario de sistema sin KC aún)
 	var kcUserID *string
 	var tempPass string
+	var kcUsername string
 	if req.UsuarioSistema {
 		existing, err := s.repo.GetPersonalByID(ctx, personalID, establecimientoID)
 		if err != nil {
@@ -218,16 +221,16 @@ func (s *EstablecimientoService) UpdatePersonal(ctx context.Context, userID, cli
 			if s.kcClient == nil {
 				return nil, fmt.Errorf("la integración con Keycloak no está configurada")
 			}
-			if req.DocumentoIdentidad == nil || *req.DocumentoIdentidad == "" {
-				return nil, fmt.Errorf("documento de identidad es requerido para crear usuario de sistema")
+			if req.Username == "" {
+				return nil, fmt.Errorf("nombre de usuario es requerido para crear usuario de sistema")
 			}
 			tempPass, err = utils.GenerateSecurePassword()
 			if err != nil {
 				return nil, fmt.Errorf("generar contraseña segura: %w", err)
 			}
-			username := "recep." + normalizeUsername(*req.DocumentoIdentidad)
+			kcUsername = req.Username
 			id, err := s.kcClient.CreateUser(ctx, keycloak.CreateUserRequest{
-				Username:          username,
+				Username:          kcUsername,
 				FirstName:         req.Nombres,
 				LastName:          req.Apellidos,
 				Password:          tempPass,
@@ -238,7 +241,7 @@ func (s *EstablecimientoService) UpdatePersonal(ctx context.Context, userID, cli
 				return nil, fmt.Errorf("crear usuario en Keycloak: %w", err)
 			}
 			kcUserID = &id
-			log.Info().Str("username", username).Str("kc_user_id", id).Msg("usuario Keycloak creado en actualización")
+			log.Info().Str("username", kcUsername).Str("kc_user_id", id).Msg("usuario Keycloak creado en actualización")
 		}
 	}
 
@@ -257,6 +260,7 @@ func (s *EstablecimientoService) UpdatePersonal(ctx context.Context, userID, cli
 		return nil, err
 	}
 	if tempPass != "" {
+		result.Username = &kcUsername
 		result.PasswordTemporal = &tempPass
 	}
 	return result, nil

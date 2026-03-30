@@ -10,8 +10,13 @@ import {
   Users,
   Loader2,
   ShieldCheck,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -19,6 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { ConfirmModal } from "@/components/shared";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -47,6 +59,9 @@ export function PersonalView({ establecimientoId }: PersonalViewProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Personal | null>(null);
   const [confirmItem, setConfirmItem] = useState<Personal | null>(null);
+  const [credenciales, setCredenciales] = useState<{ username: string; password: string } | null>(null);
+  const [copiado, setCopiado] = useState(false);
+  const [mostrarPass, setMostrarPass] = useState(false);
 
   // ── Fetch inicial ───────────────────────────────────────────────────────────
 
@@ -118,32 +133,66 @@ export function PersonalView({ establecimientoId }: PersonalViewProps) {
     if (!token) return;
     try {
       if (editingItem) {
-        await establecimientosApi.updatePersonal(
+        const res = await establecimientosApi.updatePersonal(
           token,
           establecimientoId,
           editingItem.id,
           data
         );
-        const msg = data.usuarioSistema && !editingItem.keycloakUserId
-          ? "Integrante actualizado y usuario de sistema creado"
-          : "Datos del integrante actualizados";
-        toast.success(msg);
+        setSheetOpen(false);
+        await loadData();
+        if (res?.password_temporal && res?.username) {
+          setMostrarPass(false);
+          setCopiado(false);
+          setCredenciales({ username: res.username, password: res.password_temporal });
+        } else {
+          const msg = data.usuarioSistema && !editingItem.keycloakUserId
+            ? "Integrante actualizado y usuario de sistema creado"
+            : "Datos del integrante actualizados";
+          toast.success(msg);
+        }
       } else {
-        await establecimientosApi.createPersonal(token, establecimientoId, data);
-        toast.success(
-          data.usuarioSistema
-            ? "Integrante registrado con acceso al sistema"
-            : "Integrante agregado al personal"
-        );
+        const res = await establecimientosApi.createPersonal(token, establecimientoId, data);
+        setSheetOpen(false);
+        await loadData();
+        if (res?.password_temporal && res?.username) {
+          setMostrarPass(false);
+          setCopiado(false);
+          setCredenciales({ username: res.username, password: res.password_temporal });
+        } else {
+          toast.success("Integrante agregado al personal");
+        }
       }
-      setSheetOpen(false);
-      await loadData(); // Recargar datos al guardar
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Error al guardar los datos del personal";
       toast.error(msg);
       console.error(error);
     }
   };
+
+  async function copiarCredenciales() {
+    if (!credenciales) return;
+    const texto = `Usuario: ${credenciales.username}\nContraseña: ${credenciales.password}`;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(texto);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = texto;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch {
+      // ignorar error de clipboard
+    }
+  }
 
   async function handleToggleActivo() {
     if (!confirmItem || !token) return;
@@ -405,6 +454,77 @@ export function PersonalView({ establecimientoId }: PersonalViewProps) {
         existingCI={existingCI}
         tiposPersonal={tiposPersonal}
       />
+
+      {/* Dialog credenciales recepcionista */}
+      <Dialog
+        open={!!credenciales}
+        onOpenChange={(v) => { if (!v) return; }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <ShieldCheck size={20} />
+              Usuario de sistema creado
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Entrega estas credenciales al nuevo usuario.{" "}
+              <strong className="text-destructive">
+                La contraseña solo se muestra en este momento.
+              </strong>{" "}
+              El Sistema le pedirá cambiarla en el primer inicio de sesión.
+            </p>
+
+            <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground font-medium">Usuario</span>
+                <span className="font-mono font-semibold">{credenciales?.username}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm gap-2">
+                <span className="text-muted-foreground font-medium shrink-0">Contraseña temporal</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-semibold tracking-wider">
+                    {mostrarPass
+                      ? credenciales?.password
+                      : "•".repeat(credenciales?.password.length ?? 0)}
+                  </span>
+                  <button
+                    onClick={() => setMostrarPass((v) => !v)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    type="button"
+                  >
+                    {mostrarPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={copiarCredenciales}
+              variant="outline"
+              className={`w-full gap-2 transition-colors ${copiado ? "border-green-500 text-green-700 bg-green-50 hover:bg-green-50" : ""}`}
+            >
+              {copiado ? (
+                <>
+                  <Check size={15} className="text-green-600" />
+                  ¡Copiado! Usuario y contraseña en portapapeles
+                </>
+              ) : (
+                <>
+                  <Copy size={15} />
+                  Copiar usuario y contraseña
+                </>
+              )}
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setCredenciales(null)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmación toggle activo */}
       <ConfirmModal
