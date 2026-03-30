@@ -104,4 +104,8 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO app_debezium;
 EOSQL
 
+# Re-establecer contraseña de postgres con scram-sha-256 (el init de Docker
+# puede haberla guardado con md5 antes de que postgresql.conf esté activo)
+psql -U "$PG_USER" -d "$DB" -c "ALTER USER postgres WITH PASSWORD '${POSTGRES_PASSWORD}';"
+
 log "====== BD $DB inicializada correctamente ======"

@@ -74,6 +74,10 @@ func (c *Consumer) Close() error {
 	return c.reader.Close()
 }
 
+func (c *Consumer) Stats() kafka.ReaderStats {
+	return c.reader.Stats()
+}
+
 func (c *Consumer) handle(ctx context.Context, msg kafka.Message) error {
 	if len(msg.Value) == 0 {
 		return nil

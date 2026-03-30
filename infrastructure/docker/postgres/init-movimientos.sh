@@ -112,4 +112,7 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
     ALTER TABLE public.habitaciones_replica_cache DISABLE ROW LEVEL SECURITY;
 EOSQL
 
+# Re-establecer contraseña de postgres con scram-sha-256
+psql -U "$PG_USER" -d "$DB" -c "ALTER USER postgres WITH PASSWORD '${POSTGRES_PASSWORD}';"
+
 log "====== BD $DB inicializada correctamente ======"

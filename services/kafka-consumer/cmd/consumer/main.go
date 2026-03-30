@@ -52,6 +52,17 @@ func main() {
 	errCh := make(chan error, 1)
 	go func() { errCh <- c.Run(ctx) }()
 
+	// Watchdog: si tras 120s no hay ningún fetch al broker, significa que el
+	// consumer se unió al grupo con 0 particiones asignadas (bug de arranque
+	// cuando los topics aún no existían). Salimos para que Docker nos reinicie.
+	go func() {
+		time.Sleep(120 * time.Second)
+		if stats := c.Stats(); stats.Fetches == 0 {
+			log.Error().Msg("watchdog: 0 fetch-requests en 120s — posible asignación vacía, reiniciando")
+			cancel()
+		}
+	}()
+
 	select {
 	case <-quit:
 		log.Info().Msg("señal de shutdown — deteniendo consumer")
