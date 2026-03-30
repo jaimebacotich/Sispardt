@@ -87,7 +87,7 @@ $KCADM update authentication/required-actions/update_user_locale \
 
 # ---- 5. Crear roles (idempotente) ----
 log "Creando roles..."
-for ROLE in admin_general responsable_registro tecnico_registro responsable_estadistica recepcionista; do
+for ROLE in admin_general responsable_registro tecnico_registro responsable_estadistica recepcionista estadistica_externa migraciones; do
     if ! $KCADM get "roles/${ROLE}" -r "${REALM}" >/dev/null 2>&1; then
         $KCADM create roles -r "${REALM}" -s name="${ROLE}"
         ok "  Rol creado: ${ROLE}"
@@ -325,7 +325,7 @@ create_service_client() {
 
 create_service_client "sispardt-establecimientos-svc"   "${KC_SECRET_EST_SVC:?Variable KC_SECRET_EST_SVC requerida}"
 create_service_client "sispardt-movimientos-svc"        "${KC_SECRET_MOV_SVC:?Variable KC_SECRET_MOV_SVC requerida}"
-create_service_client "sispardt-auditoria-sesiones-svc" "${KC_SECRET_AUDIT_SES_SVC:?Variable KC_SECRET_AUDIT_SES_SVC requerida}"
+create_service_client "sispardt-sistema-svc"            "${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}"
 
 # ---- 10b. Asignar manage-users al service account de sispardt-establecimientos-svc ----
 log "Asignando manage-users a sispardt-establecimientos-svc..."
@@ -380,35 +380,39 @@ else
     log "  WARN: no se pudo obtener service-account-user de sispardt-movimientos-svc"
 fi
 
-# ---- 10c. Asignar roles al service account de sispardt-auditoria-sesiones-svc ----
+# ---- 10c. Asignar roles al service account de sispardt-sistema-svc ----
 # Roles requeridos:
 #   view-events  → leer eventos de login/logout del realm
 #   view-clients → consultar sesiones activas por cliente UUID
 #   query-users  → resolver username desde userId
 #   view-users   → obtener roles del usuario (para /conectados)
-log "Asignando roles de auditoría a sispardt-auditoria-sesiones-svc..."
+#   manage-users → crear/editar/eliminar usuarios del sistema
+#   view-realm   → consultar realm para operaciones admin
+log "Asignando roles a sispardt-sistema-svc..."
 
-AUDIT_SVC_ID=$(
-    $KCADM get clients -r "${REALM}" -q "clientId=sispardt-auditoria-sesiones-svc" --fields id 2>/dev/null \
+SISTEMA_SVC_ID=$(
+    $KCADM get clients -r "${REALM}" -q "clientId=sispardt-sistema-svc" --fields id 2>/dev/null \
     | grep '"id"' | cut -d'"' -f4 | head -1
 )
-AUDIT_SVC_USER_ID=$(
-    $KCADM get "clients/${AUDIT_SVC_ID}/service-account-user" \
+SISTEMA_SVC_USER_ID=$(
+    $KCADM get "clients/${SISTEMA_SVC_ID}/service-account-user" \
         -r "${REALM}" --fields id 2>/dev/null \
     | grep '"id"' | cut -d'"' -f4 | head -1
 )
 
-if [ -n "$AUDIT_SVC_USER_ID" ] && [ -n "$REALM_MGMT_ID" ]; then
-    $KCADM add-roles -r "${REALM}" --uid "${AUDIT_SVC_USER_ID}" \
+if [ -n "$SISTEMA_SVC_USER_ID" ] && [ -n "$REALM_MGMT_ID" ]; then
+    $KCADM add-roles -r "${REALM}" --uid "${SISTEMA_SVC_USER_ID}" \
         --cclientid realm-management \
         --rolename view-events \
         --rolename view-clients \
         --rolename query-users \
-        --rolename view-users 2>/dev/null \
-        && ok "  view-events, view-clients, query-users y view-users asignados a sispardt-auditoria-sesiones-svc" \
+        --rolename view-users \
+        --rolename manage-users \
+        --rolename view-realm 2>/dev/null \
+        && ok "  view-events, view-clients, query-users, view-users, manage-users y view-realm asignados a sispardt-sistema-svc" \
         || log "  WARN: no se pudo asignar roles KC admin (pueden ya estar asignados)"
 else
-    log "  WARN: no se pudo obtener service-account-user de sispardt-auditoria-sesiones-svc"
+    log "  WARN: no se pudo obtener service-account-user de sispardt-sistema-svc"
 fi
 
 # ---- 10d. Habilitar registro de eventos en el realm (R-02) ----
@@ -487,7 +491,7 @@ log "    resp.estadistica -> responsable_estadistica (${INST_UUID})"
 log "  Contraseña: ver variable SISPARDT_USER_PASSWORD en .env"
 log "  Login: ${KC_URL}/realms/${REALM}/account"
 log "  Clientes SA:"
-log "    sispardt-establecimientos-svc  → manage-users, view-users, view-realm"
-log "    sispardt-movimientos-svc       → query-users, view-users"
-log "    sispardt-auditoria-sesiones-svc → view-events, view-clients, query-users, view-users"
+log "    sispardt-establecimientos-svc → manage-users, view-users, view-realm"
+log "    sispardt-movimientos-svc      → query-users, view-users"
+log "    sispardt-sistema-svc          → view-events, view-clients, query-users, view-users, manage-users, view-realm"
 log "  Eventos KC: LOGIN, LOGOUT, LOGIN_ERROR habilitados"

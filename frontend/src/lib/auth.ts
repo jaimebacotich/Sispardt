@@ -53,11 +53,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const rolesClaimString = JSON.stringify(atp.roles || "") + JSON.stringify((atp.realm_access as Record<string, unknown>)?.roles || "");
         const validRoles = [
-          "admin_general", 
-          "responsable_registro", 
+          "admin_general",
+          "responsable_registro",
           "tecnico_registro",
-          "responsable_estadistica", 
-          "recepcionista"
+          "responsable_estadistica",
+          "recepcionista",
+          "estadistica_externa",
+          "migraciones",
         ];
         token.roles = validRoles.filter(r => rolesClaimString.includes(r)) as Role[];
         token.establecimientoId = (atp.establecimiento_id as string) ?? null;

@@ -379,6 +379,45 @@ export interface EstadisticasPeriodo {
 }
 
 /* ============================================================
+ * Usuarios del Sistema
+ * ============================================================ */
+
+export interface UsuarioSistema {
+  id: string;
+  username: string;
+  nombres: string;
+  apellidos: string;
+  estado: string;
+  roles: string[];
+  creado_at: string;
+}
+
+export interface UsuarioSistemaCreadoResponse {
+  usuario: UsuarioSistema;
+  password_temporal: string;
+  required_actions: string[];
+}
+
+export interface UsuarioSistemaCreate {
+  username: string;
+  nombres: string;
+  apellidos: string;
+  rol_nombre: string;
+}
+
+export interface UsuarioSistemaUpdate {
+  nombres?: string;
+  apellidos?: string;
+  estado?: string;
+}
+
+export interface RolSistema {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+}
+
+/* ============================================================
  * Auditoría de Sesiones
  * ============================================================ */
 

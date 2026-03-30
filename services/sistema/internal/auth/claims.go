@@ -6,8 +6,6 @@ import "context"
 type Claims struct {
 	Sub               string   // keycloak user UUID
 	Username          string   // preferred_username
-	FirstName         string   // given_name
-	LastName          string   // family_name
 	Roles             []string // roles del realm (flatlist)
 	EstablecimientoID string   // atributo personalizado (solo recepcionistas)
 }
@@ -32,13 +30,7 @@ func (c *Claims) HasAnyRole(roles ...string) bool {
 
 // Roles del sistema
 const (
-	RoleAdminGeneral           = "admin_general"
-	RoleResponsableRegistro    = "responsable_registro"
-	RoleTecnicoRegistro        = "tecnico_registro"
-	RoleResponsableEstadistica = "responsable_estadistica"
-	RoleRecepcionista          = "recepcionista"
-	RoleEstadisticaExterna     = "estadistica_externa"
-	RoleMigraciones            = "migraciones"
+	RoleAdminGeneral = "admin_general"
 )
 
 // contextKey tipo privado para evitar colisiones en context

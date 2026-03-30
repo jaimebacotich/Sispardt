@@ -70,11 +70,17 @@ func (c *AdminClient) getAdminToken(ctx context.Context) (string, error) {
 
 // ─── Crear usuario ────────────────────────────────────────────────────────────
 
+// CreateUserRequest parámetros para crear un usuario en Keycloak.
+// Password: contraseña temporal a asignar; si está vacío se usa defaultPassword.
+// RoleName: nombre del rol KC a asignar (sin prefijo "rol_"); si está vacío no se asigna rol.
+// EstablecimientoID: opcional, solo para recepcionistas.
 type CreateUserRequest struct {
 	Username          string
 	FirstName         string
 	LastName          string
-	EstablecimientoID string
+	Password          string // si vacío, usa c.defaultPassword
+	RoleName          string // si vacío, no asigna rol
+	EstablecimientoID string // si vacío, no se añade el atributo
 }
 
 type createUserPayload struct {
@@ -83,10 +89,10 @@ type createUserPayload struct {
 	LastName        string              `json:"lastName"`
 	Enabled         bool                `json:"enabled"`
 	RequiredActions []string            `json:"requiredActions"`
-	Attributes      map[string][]string `json:"attributes"`
+	Attributes      map[string][]string `json:"attributes,omitempty"`
 }
 
-// CreateUser crea el usuario, le asigna contraseña temporal y el rol recepcionista.
+// CreateUser crea el usuario, le asigna contraseña temporal y opcionalmente un rol.
 // Retorna el UUID del usuario creado en Keycloak.
 func (c *AdminClient) CreateUser(ctx context.Context, req CreateUserRequest) (string, error) {
 	token, err := c.getAdminToken(ctx)
@@ -101,10 +107,13 @@ func (c *AdminClient) CreateUser(ctx context.Context, req CreateUserRequest) (st
 		LastName:        req.LastName,
 		Enabled:         true,
 		RequiredActions: []string{"UPDATE_PASSWORD"},
-		Attributes: map[string][]string{
-			"establecimiento_id": {req.EstablecimientoID},
-		},
 	}
+	if req.EstablecimientoID != "" {
+		payload.Attributes = map[string][]string{
+			"establecimiento_id": {req.EstablecimientoID},
+		}
+	}
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
@@ -137,16 +146,24 @@ func (c *AdminClient) CreateUser(ctx context.Context, req CreateUserRequest) (st
 		return "", fmt.Errorf("crear usuario KC: no se pudo extraer el ID del usuario desde Location")
 	}
 
+	// Determinar contraseña a usar
+	pass := req.Password
+	if pass == "" {
+		pass = c.defaultPassword
+	}
+
 	// Establecer contraseña temporal
-	if err := c.setPassword(ctx, token, userID); err != nil {
+	if err := c.setPasswordValue(ctx, token, userID, pass); err != nil {
 		_ = c.deleteUser(ctx, userID)
 		return "", fmt.Errorf("establecer contraseña KC: %w", err)
 	}
 
-	// Asignar rol recepcionista
-	if err := c.addRealmRole(ctx, token, userID, "recepcionista"); err != nil {
-		_ = c.deleteUser(ctx, userID)
-		return "", fmt.Errorf("asignar rol KC: %w", err)
+	// Asignar rol si se especificó
+	if req.RoleName != "" {
+		if err := c.addRealmRole(ctx, token, userID, req.RoleName); err != nil {
+			_ = c.deleteUser(ctx, userID)
+			return "", fmt.Errorf("asignar rol KC: %w", err)
+		}
 	}
 
 	return userID, nil
@@ -174,6 +191,119 @@ func (c *AdminClient) deleteUser(ctx context.Context, userID string) error {
 		return err
 	}
 	defer resp.Body.Close()
+	return nil
+}
+
+// ─── Actualizar usuario ───────────────────────────────────────────────────────
+
+// UpdateUserEnabled activa o desactiva un usuario en Keycloak.
+func (c *AdminClient) UpdateUserEnabled(ctx context.Context, userID string, enabled bool) error {
+	token, err := c.getAdminToken(ctx)
+	if err != nil {
+		return err
+	}
+	apiURL := fmt.Sprintf("%s/admin/realms/%s/users/%s", c.baseURL, c.realm, userID)
+	payload := map[string]bool{"enabled": enabled}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("UpdateUserEnabled KC (%s): %w", userID, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("UpdateUserEnabled KC (%s): HTTP %d: %s", userID, resp.StatusCode, string(b))
+	}
+	return nil
+}
+
+// UpdateUserDetails actualiza firstName y lastName de un usuario en Keycloak.
+func (c *AdminClient) UpdateUserDetails(ctx context.Context, userID, firstName, lastName string) error {
+	token, err := c.getAdminToken(ctx)
+	if err != nil {
+		return err
+	}
+	apiURL := fmt.Sprintf("%s/admin/realms/%s/users/%s", c.baseURL, c.realm, userID)
+	payload := map[string]string{"firstName": firstName, "lastName": lastName}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("UpdateUserDetails KC (%s): %w", userID, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("UpdateUserDetails KC (%s): HTTP %d: %s", userID, resp.StatusCode, string(b))
+	}
+	return nil
+}
+
+// AddRealmRole asigna un rol del realm a un usuario ya existente.
+func (c *AdminClient) AddRealmRole(ctx context.Context, userID, roleName string) error {
+	token, err := c.getAdminToken(ctx)
+	if err != nil {
+		return err
+	}
+	return c.addRealmRole(ctx, token, userID, roleName)
+}
+
+// RemoveRealmRole quita un rol del realm a un usuario.
+func (c *AdminClient) RemoveRealmRole(ctx context.Context, userID, roleName string) error {
+	token, err := c.getAdminToken(ctx)
+	if err != nil {
+		return err
+	}
+	// Obtener el ID del rol
+	roleURL := fmt.Sprintf("%s/admin/realms/%s/roles/%s", c.baseURL, c.realm, roleName)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, roleURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("obtener rol %s: HTTP %d", roleName, resp.StatusCode)
+	}
+	var role roleRepresentation
+	if err := json.NewDecoder(resp.Body).Decode(&role); err != nil {
+		return err
+	}
+
+	// Quitar el rol
+	mappingURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/role-mappings/realm", c.baseURL, c.realm, userID)
+	roles := []roleRepresentation{role}
+	body, _ := json.Marshal(roles)
+	req2, err := http.NewRequestWithContext(ctx, http.MethodDelete, mappingURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("Authorization", "Bearer "+token)
+	resp2, err := c.httpClient.Do(req2)
+	if err != nil {
+		return fmt.Errorf("RemoveRealmRole KC (%s): %w", userID, err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusNoContent {
+		b, _ := io.ReadAll(resp2.Body)
+		return fmt.Errorf("RemoveRealmRole KC (%s): HTTP %d: %s", userID, resp2.StatusCode, string(b))
+	}
 	return nil
 }
 
@@ -266,9 +396,9 @@ type passwordPayload struct {
 	Temporary bool   `json:"temporary"`
 }
 
-func (c *AdminClient) setPassword(ctx context.Context, token, userID string) error {
+func (c *AdminClient) setPasswordValue(ctx context.Context, token, userID, value string) error {
 	pwURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/reset-password", c.baseURL, c.realm, userID)
-	payload := passwordPayload{Type: "password", Value: c.defaultPassword, Temporary: true}
+	payload := passwordPayload{Type: "password", Value: value, Temporary: true}
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, pwURL, bytes.NewReader(body))
 	if err != nil {

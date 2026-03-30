@@ -23,6 +23,7 @@ import {
   FlaskConical,
   Wifi,
   History,
+  Users,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 import { useEstablecimientoActual } from "@/hooks/useEstablecimientoActual";
@@ -162,6 +163,12 @@ const NAV_ENTRIES: NavEntry[] = [
     icon: Wifi,
     roles: ["admin_general"],
   },
+  {
+    label: "Gestión de Usuarios",
+    href: "/usuarios-sistema",
+    icon: Users,
+    roles: ["admin_general"],
+  },
 ];
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -170,6 +177,8 @@ const ROLE_LABELS: Record<Role, string> = {
   tecnico_registro:        "Técnico Registro",
   responsable_estadistica: "Resp. Estadística",
   recepcionista:           "Recepcionista",
+  estadistica_externa:     "Estadística Externa",
+  migraciones:             "Migraciones",
 };
 
 // ── Componente hoja ──────────────────────────────────────────────────────────

@@ -3,7 +3,9 @@ export type Role =
   | "responsable_registro"
   | "tecnico_registro"
   | "responsable_estadistica"
-  | "recepcionista";
+  | "recepcionista"
+  | "estadistica_externa"
+  | "migraciones";
 
 export interface UserSession {
   sub: string;

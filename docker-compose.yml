@@ -102,31 +102,31 @@ services:
       retries: 5
       start_period: 60s
 
-  db-auditoria-sesiones:
+  db-sistema:
     build:
       context: ./infrastructure/docker/postgres
       dockerfile: Dockerfile
       args:
         PGPARTMAN_VERSION: "5.2.0"
     image: sispardt/postgres:17.2-alpine
-    container_name: sispardt-db-auditoria-sesiones
+    container_name: sispardt-db-sistema
     restart: unless-stopped
     environment:
-      POSTGRES_DB:            sispardt_auditoria_sesiones
-      POSTGRES_USER:          ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD:      ${POSTGRES_PASSWORD_AUDIT_SES:?Variable POSTGRES_PASSWORD_AUDIT_SES requerida}
-      APP_PASS_AUDIT_SES_APP: ${POSTGRES_PASSWORD_AUDIT_SES_APP:?Variable POSTGRES_PASSWORD_AUDIT_SES_APP requerida}
+      POSTGRES_DB:       sispardt_sistema
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_SISTEMA:?Variable POSTGRES_PASSWORD_SISTEMA requerida}
+      APP_PASS_SISTEMA:  ${APP_PASS_SISTEMA:?Variable APP_PASS_SISTEMA requerida}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - pg-audit-ses-data:/var/lib/postgresql/data
-      - ./infrastructure/docker/postgres/init-auditoria-sesiones.sh:/docker-entrypoint-scripts/do-init.sh:ro
-      - ./db_script_local/scripts/auditoria-sesiones:/docker-entrypoint-scripts/auditoria-sesiones:ro
+      - pg-sistema-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init-sistema.sh:/docker-entrypoint-scripts/do-init.sh:ro
+      - ./db_script_local/scripts/sistema:/docker-entrypoint-scripts/sistema:ro
     ports:
-      - "${PORT_DB_AUDIT_SES:-5435}:5432"
+      - "${PORT_DB_SISTEMA:-5435}:5432"
     networks:
       - sispardt-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d sispardt_auditoria_sesiones"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d sispardt_sistema"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -204,7 +204,7 @@ services:
       SISPARDT_USER_PASSWORD:  ${SISPARDT_USER_PASSWORD:?Variable SISPARDT_USER_PASSWORD requerida}
       KC_SECRET_EST_SVC:          ${KC_SECRET_EST_SVC:?Variable KC_SECRET_EST_SVC requerida}
       KC_SECRET_MOV_SVC:          ${KC_SECRET_MOV_SVC:?Variable KC_SECRET_MOV_SVC requerida}
-      KC_SECRET_AUDIT_SES_SVC:    ${KC_SECRET_AUDIT_SES_SVC:?Variable KC_SECRET_AUDIT_SES_SVC requerida}
+      KC_SECRET_SISTEMA_SVC:      ${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}
       APP_HOST:                   ${APP_HOST:-localhost}
       APP_PORT:                ${APP_PORT:-3100}
     volumes:
@@ -378,29 +378,29 @@ services:
       - "traefik.http.routers.frontend.priority=1"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
 
-  svc-auditoria-sesiones:
+  svc-sistema:
     build:
-      context: ./services/auditoria-sesiones
+      context: ./services/sistema
       dockerfile: Dockerfile
-    image: sispardt/svc-auditoria-sesiones:latest
-    container_name: sispardt-svc-auditoria-sesiones
+    image: sispardt/svc-sistema:latest
+    container_name: sispardt-svc-sistema
     restart: unless-stopped
     environment:
-      PORT:                  "8084"
-      DB_DSN:                "postgres://app_auditoria_sesiones:${POSTGRES_PASSWORD_AUDIT_SES_APP}@db-auditoria-sesiones:5432/sispardt_auditoria_sesiones?sslmode=disable&pool_max_conns=10"
+      PORT:                  "8085"
+      DB_DSN:                "postgres://app_sistema:${APP_PASS_SISTEMA}@db-sistema:5432/sispardt_sistema?sslmode=disable&pool_max_conns=10"
       KEYCLOAK_JWKS_URL:     "${KEYCLOAK_JWKS_URL_INTERNAL:-http://keycloak:8080/realms/sispardt/protocol/openid-connect/certs}"
       KEYCLOAK_ISSUER:       "http://${APP_HOST:-localhost}:${KC_HTTP_PORT:-8080}/realms/sispardt"
       KEYCLOAK_ADMIN_URL:    "http://keycloak:8080"
       KEYCLOAK_REALM:        "${KEYCLOAK_REALM:-sispardt}"
-      KC_CLIENT_ID:          "sispardt-auditoria-sesiones-svc"
-      KC_CLIENT_SECRET:      "${KC_SECRET_AUDIT_SES_SVC:?Variable KC_SECRET_AUDIT_SES_SVC requerida}"
+      KC_CLIENT_ID:          "sispardt-sistema-svc"
+      KC_CLIENT_SECRET:      "${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}"
       POLL_INTERVAL_SECONDS: "10"
       LOG_LEVEL:             "${LOG_LEVEL:-info}"
       ENV:                   "${ENV:-development}"
     networks:
       - sispardt-net
     depends_on:
-      db-auditoria-sesiones:
+      db-sistema:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -408,17 +408,17 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auditoria-sesiones.rule=PathPrefix(`/api/v1/auditoria-sesiones`)"
-      - "traefik.http.routers.auditoria-sesiones.entrypoints=web"
-      - "traefik.http.routers.auditoria-sesiones.priority=90"
-      - "traefik.http.routers.auditoria-sesiones.middlewares=auditoria-sesiones-ratelimit"
-      - "traefik.http.middlewares.auditoria-sesiones-ratelimit.ratelimit.average=20"
-      - "traefik.http.middlewares.auditoria-sesiones-ratelimit.ratelimit.burst=5"
-      - "traefik.http.services.auditoria-sesiones.loadbalancer.server.port=8084"
-      - "traefik.http.services.auditoria-sesiones.loadbalancer.healthcheck.path=/health"
-      - "traefik.http.services.auditoria-sesiones.loadbalancer.healthcheck.interval=15s"
+      - "traefik.http.routers.sistema.rule=PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`)"
+      - "traefik.http.routers.sistema.entrypoints=web"
+      - "traefik.http.routers.sistema.priority=90"
+      - "traefik.http.routers.sistema.middlewares=sistema-ratelimit"
+      - "traefik.http.middlewares.sistema-ratelimit.ratelimit.average=20"
+      - "traefik.http.middlewares.sistema-ratelimit.ratelimit.burst=5"
+      - "traefik.http.services.sistema.loadbalancer.server.port=8085"
+      - "traefik.http.services.sistema.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.sistema.loadbalancer.healthcheck.interval=15s"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -663,8 +663,8 @@ volumes:
     name: sispardt-pg-mov-data
   pg-kc-data:
     name: sispardt-pg-kc-data
-  pg-audit-ses-data:
-    name: sispardt-pg-audit-ses-data
+  pg-sistema-data:
+    name: sispardt-pg-sistema-data
   kafka-data:
     name: sispardt-kafka-data
   prometheus-data:

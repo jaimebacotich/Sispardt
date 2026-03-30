@@ -144,6 +144,7 @@ func NewRouter(
 				auth.RoleResponsableRegistro,
 			)).Delete("/{id}", estHandler.Delete)
 		})
+
 	})
 
 	return r

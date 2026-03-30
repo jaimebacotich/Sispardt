@@ -19,17 +19,17 @@ http:
       entryPoints:
         - web
 
-    auditoria-sesiones:
-      rule: "PathPrefix(`/api/v1/auditoria-sesiones`)"
-      service: svc-auditoria-sesiones
+    sistema:
+      rule: "PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`)"
+      service: svc-sistema
       middlewares:
-        - auditoria-sesiones-ratelimit
+        - sistema-ratelimit
       entryPoints:
         - web
       priority: 200
 
   middlewares:
-    auditoria-sesiones-ratelimit:
+    sistema-ratelimit:
       rateLimit:
         average: 20
         burst: 5
@@ -45,10 +45,10 @@ http:
         servers:
           - url: "http://svc-movimientos:8082"
 
-    svc-auditoria-sesiones:
+    svc-sistema:
       loadBalancer:
         servers:
-          - url: "http://svc-auditoria-sesiones:8084"
+          - url: "http://svc-sistema:8085"
         healthCheck:
           path: /health
           interval: 15s

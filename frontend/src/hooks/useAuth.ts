@@ -55,6 +55,24 @@ const MOCK_USERS: Record<Role, {
     establecimientoId: null,
     accessToken: "mock-token",
   },
+  estadistica_externa: {
+    sub: "00000000-0000-0000-0000-000000000006",
+    username: "estad_ext_demo",
+    fullName: "Estadística Externa Demo",
+    email: "estad.ext@sispardt.gob.bo",
+    roles: ["estadistica_externa"],
+    establecimientoId: null,
+    accessToken: "mock-token",
+  },
+  migraciones: {
+    sub: "00000000-0000-0000-0000-000000000007",
+    username: "migraciones_demo",
+    fullName: "Migraciones Demo",
+    email: "migraciones@sispardt.gob.bo",
+    roles: ["migraciones"],
+    establecimientoId: null,
+    accessToken: "mock-token",
+  },
 };
 
 function getMockRole(): Role {
