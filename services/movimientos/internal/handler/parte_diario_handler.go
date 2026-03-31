@@ -326,17 +326,14 @@ func (h *EstadisticasHandler) TiposHabitacion(w http.ResponseWriter, r *http.Req
 	jsonOK(w, result)
 }
 
-// parseStatsParams extrae y valida establecimiento_id, fecha_desde y fecha_hasta.
-// Para recepcionistas toma el establecimiento del token JWT.
+// parseStatsParams extrae y valida fecha_desde y fecha_hasta.
+// establecimiento_id es opcional: si está vacío se agregan todos los establecimientos.
+// Para recepcionistas siempre se fuerza el establecimiento del token JWT.
 func (h *EstadisticasHandler) parseStatsParams(w http.ResponseWriter, r *http.Request) (estID, desde, hasta string, ok bool) {
 	claims := auth.FromContext(r.Context())
 	estID = r.URL.Query().Get("establecimiento_id")
 	if claims.HasRole(auth.RoleRecepcionista) {
 		estID = claims.EstablecimientoID
-	}
-	if estID == "" {
-		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
-		return "", "", "", false
 	}
 	desde = r.URL.Query().Get("fecha_desde")
 	hasta = r.URL.Query().Get("fecha_hasta")

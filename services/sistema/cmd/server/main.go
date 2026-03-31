@@ -52,9 +52,9 @@ func main() {
 	log.Info().Msg("conexión a PostgreSQL establecida")
 
 	// Inicializar validador JWT con JWKS de Keycloak
-	jwtValidator, err := auth.NewJWTValidator(ctx, cfg.KeycloakJWKSURL, cfg.KeycloakIssuer)
+	jwtValidator, err := newJWTValidatorWithRetry(ctx, cfg.KeycloakJWKSURL, cfg.KeycloakIssuer)
 	if err != nil {
-		log.Fatal().Err(err).Str("jwks_url", cfg.KeycloakJWKSURL).Msg("no se pudo inicializar el validador JWT")
+		log.Fatal().Err(err).Str("jwks_url", cfg.KeycloakJWKSURL).Msg("no se pudo inicializar el validador JWT tras reintentos")
 	}
 	log.Info().Str("issuer", cfg.KeycloakIssuer).Msg("validador JWT listo")
 
@@ -120,6 +120,26 @@ func main() {
 		log.Error().Err(err).Msg("error durante el shutdown")
 	}
 	log.Info().Msg("servidor apagado correctamente")
+}
+
+func newJWTValidatorWithRetry(ctx context.Context, jwksURL, issuer string) (*auth.JWTValidator, error) {
+	delays := []time.Duration{5, 10, 20, 40, 60}
+	var err error
+	for i, d := range delays {
+		var v *auth.JWTValidator
+		v, err = auth.NewJWTValidator(ctx, jwksURL, issuer)
+		if err == nil {
+			return v, nil
+		}
+		log.Warn().Err(err).Int("intento", i+1).Dur("espera_s", d*time.Second).
+			Msg("validador JWT no disponible — reintentando")
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(d * time.Second):
+		}
+	}
+	return nil, err
 }
 
 func setupLogger(level, env string) {

@@ -97,50 +97,38 @@ export const movimientosApi = {
 
   getResumen: (
     token: string,
-    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }
+    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }
   ) => {
-    const q = new URLSearchParams({
-      establecimiento_id: params.establecimientoId,
-      fecha_desde: params.fechaDesde,
-      fecha_hasta: params.fechaHasta,
-    });
+    const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
+    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
     return apiClient.get<ResumenEstadisticas>(`/api/v1/estadisticas/resumen?${q}`, token);
   },
 
   getNacionalidades: (
     token: string,
-    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }
+    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }
   ) => {
-    const q = new URLSearchParams({
-      establecimiento_id: params.establecimientoId,
-      fecha_desde: params.fechaDesde,
-      fecha_hasta: params.fechaHasta,
-    });
+    const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
+    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
     return apiClient.get<NacionalidadStat[]>(`/api/v1/estadisticas/nacionalidades?${q}`, token);
   },
 
   getMotivosViaje: (
     token: string,
-    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string; agrupacion?: string }
+    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string; agrupacion?: string }
   ) => {
-    const q = new URLSearchParams({
-      establecimiento_id: params.establecimientoId,
-      fecha_desde: params.fechaDesde,
-      fecha_hasta: params.fechaHasta,
-    });
+    const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
+    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
     if (params.agrupacion) q.set("agrupacion", params.agrupacion);
     return apiClient.get<MotivosPeriodo[]>(`/api/v1/estadisticas/motivos?${q}`, token);
   },
 
   getTiposHabitacion: (
     token: string,
-    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }
+    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }
   ) => {
-    const q = new URLSearchParams({
-      establecimiento_id: params.establecimientoId,
-      fecha_desde: params.fechaDesde,
-      fecha_hasta: params.fechaHasta,
-    });
+    const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
+    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
     return apiClient.get<TipoHabitacionStat[]>(`/api/v1/estadisticas/tipos-habitacion?${q}`, token);
   },
 };

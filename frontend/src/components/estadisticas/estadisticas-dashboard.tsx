@@ -125,15 +125,15 @@ export function EstadisticasDashboard() {
     [estList]
   );
 
-  // Params para hooks de estadísticas (requieren establecimientoId + fechas)
-  const statsParams = { establecimientoId, fechaDesde: fd, fechaHasta: fh };
-  const enabled = !!establecimientoId && !customInvalid;
+  // Params para hooks de estadísticas. establecimientoId opcional: vacío = todos los establecimientos.
+  const statsParams = { establecimientoId: establecimientoId || undefined, fechaDesde: fd, fechaHasta: fh };
+  const datesReady = !customInvalid && !!fd && !!fh;
 
-  const { data: resumen,       isLoading: loadingResumen      } = useResumenEstadisticas(enabled ? statsParams : { establecimientoId: "", fechaDesde: fd, fechaHasta: fh });
-  const { data: ocupacionData, isLoading: loadingOcupacion    } = useOcupacion(enabled ? establecimientoId : "", fd, fh);
-  const { data: nacionalidades,isLoading: loadingNac          } = useNacionalidades(enabled ? statsParams : { establecimientoId: "", fechaDesde: fd, fechaHasta: fh });
-  const { data: motivos,       isLoading: loadingMotivos       } = useMotivosViaje(enabled ? { ...statsParams, agrupacion: agrupacionDesdePeriodo(periodo) } : { establecimientoId: "", fechaDesde: fd, fechaHasta: fh });
-  const { data: tiposHab,      isLoading: loadingTipos         } = useTiposHabitacion(enabled ? statsParams : { establecimientoId: "", fechaDesde: fd, fechaHasta: fh });
+  const { data: resumen,        isLoading: loadingResumen   } = useResumenEstadisticas(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
+  const { data: ocupacionData,  isLoading: loadingOcupacion } = useOcupacion(establecimientoId, datesReady ? fd : "", datesReady ? fh : "");
+  const { data: nacionalidades, isLoading: loadingNac       } = useNacionalidades(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
+  const { data: motivos,        isLoading: loadingMotivos   } = useMotivosViaje(datesReady ? { ...statsParams, agrupacion: agrupacionDesdePeriodo(periodo) } : { fechaDesde: "", fechaHasta: "" });
+  const { data: tiposHab,       isLoading: loadingTipos     } = useTiposHabitacion(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
 
   const ahora = new Date();
   const actualizado =
@@ -233,10 +233,10 @@ export function EstadisticasDashboard() {
         )}
       </div>
 
-      {/* Aviso cuando no hay establecimiento seleccionado (roles admin) */}
+      {/* Aviso modo agregado — cuando no hay establecimiento seleccionado */}
       {!isRecepcionista && !establecimientoId && (
         <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-4 py-2.5">
-          Selecciona un establecimiento para ver los datos estadísticos.
+          Mostrando estadísticas agregadas de todos los establecimientos. Selecciona uno para ver datos individuales.
         </p>
       )}
 

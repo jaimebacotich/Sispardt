@@ -48,6 +48,20 @@ GRANT SELECT ON TABLE public.partes_diarios TO rol_responsable_estadistica;
 GRANT SELECT ON TABLE public.cierres_diarios TO rol_responsable_estadistica;
 GRANT SELECT ON TABLE public.habitaciones_replica_cache TO rol_responsable_estadistica;
 GRANT SELECT ON TABLE public.personas TO rol_responsable_estadistica;
+-- Catálogos necesarios para queries de estadísticas
+GRANT SELECT ON TABLE public.paises_replica_cache TO rol_responsable_estadistica;
+GRANT SELECT ON TABLE public.motivos_viaje TO rol_responsable_estadistica;
+GRANT SELECT ON TABLE public.localidades_replica_cache TO rol_responsable_estadistica;
+GRANT SELECT ON TABLE public.divisiones_principales_replica_cache TO rol_responsable_estadistica;
+GRANT SELECT ON TABLE public.divisiones_secundarias_replica_cache TO rol_responsable_estadistica;
+GRANT SELECT ON TABLE public.tipos_documento TO rol_responsable_estadistica;
+-- Vistas estadísticas (usadas por statsPool en svc-movimientos)
+GRANT SELECT ON public.vw_capacidad_establecimiento TO rol_responsable_estadistica;
+GRANT SELECT ON public.vw_ocupacion_diaria TO rol_responsable_estadistica;
+GRANT SELECT ON public.vw_estadistica_ingresos TO rol_responsable_estadistica;
+GRANT SELECT ON public.vw_estadistica_pernocte TO rol_responsable_estadistica;
+GRANT SELECT ON public.vw_estadistica_consolidada TO rol_responsable_estadistica;
+GRANT SELECT ON public.vw_dias_no_cerrados TO rol_responsable_estadistica;
 
 -- ============================================
 -- Recepcionista: INSERT/UPDATE partes, INSERT cierres (solo su establecimiento via RLS)

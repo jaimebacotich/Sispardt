@@ -738,16 +738,18 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 
 func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, establecimientoID string, desde, hasta time.Time) ([]domain.OcupacionDiaria, error) {
 	const sql = `
-		SELECT od.establecimiento_id, od.fecha_reporte::text,
-		       od.total_huespedes, vce.capacidad_total
+		SELECT od.fecha_reporte::text,
+		       SUM(od.total_huespedes)          AS total_huespedes,
+		       SUM(vce.capacidad_total)          AS capacidad_total
 		FROM public.vw_ocupacion_diaria od
 		LEFT JOIN public.vw_capacidad_establecimiento vce
 		       ON vce.establecimiento_id = od.establecimiento_id
-		WHERE od.establecimiento_id = $1
+		WHERE ($1::uuid IS NULL OR od.establecimiento_id = $1::uuid)
 		  AND od.fecha_reporte BETWEEN $2 AND $3
+		GROUP BY od.fecha_reporte
 		ORDER BY od.fecha_reporte`
 
-	rows, err := r.statsPool.Query(ctx, sql, establecimientoID, desde, hasta)
+	rows, err := r.statsPool.Query(ctx, sql, estParam(establecimientoID), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("ocupacion diaria: %w", err)
 	}
@@ -756,7 +758,7 @@ func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, establecimientoID
 	var results []domain.OcupacionDiaria
 	for rows.Next() {
 		var o domain.OcupacionDiaria
-		if err := rows.Scan(&o.EstablecimientoID, &o.FechaReporte, &o.TotalHuespedes, &o.CapacidadTotal); err != nil {
+		if err := rows.Scan(&o.FechaReporte, &o.TotalHuespedes, &o.CapacidadTotal); err != nil {
 			return nil, fmt.Errorf("scan ocupacion: %w", err)
 		}
 		if o.CapacidadTotal != nil && *o.CapacidadTotal > 0 {
@@ -774,9 +776,9 @@ func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, establecimientoID
 func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimientoID string, desde, hasta time.Time) (domain.ResumenEstadisticas, error) {
 	const sql = `
 		WITH capacidad AS (
-			SELECT COALESCE(capacidad_total, 0) AS capacidad_total
+			SELECT COALESCE(SUM(capacidad_total), 0) AS capacidad_total
 			FROM public.vw_capacidad_establecimiento
-			WHERE establecimiento_id = $1
+			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
 		),
 		pernoctes AS (
 			SELECT
@@ -789,24 +791,25 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimien
 				  AND DATE(salida_at) BETWEEN $2 AND $3)                                        AS total_checkouts,
 				COUNT(*) FILTER (WHERE estado_operativo = 'ACTIVO'
 				  AND pais_procedencia_id NOT IN (
-				      SELECT id FROM public.paises_replica_cache WHERE codigo_iso = 'BO'))      AS total_extranjeros
+				      SELECT id FROM public.paises_replica_cache WHERE codigo_iso = 'BOL'))     AS total_extranjeros
 			FROM public.partes_diarios
-			WHERE establecimiento_id = $1
+			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
 			  AND fecha_reporte BETWEEN $2 AND $3
 			  AND estado_operativo = 'ACTIVO'
 		),
 		ocupacion_diaria AS (
 			SELECT od.fecha_reporte,
-			       od.total_huespedes,
+			       SUM(od.total_huespedes)                              AS total_huespedes,
 			       COALESCE((SELECT capacidad_total FROM capacidad), 0) AS capacidad_total
 			FROM public.vw_ocupacion_diaria od
-			WHERE od.establecimiento_id = $1
+			WHERE ($1::uuid IS NULL OR od.establecimiento_id = $1::uuid)
 			  AND od.fecha_reporte BETWEEN $2 AND $3
+			GROUP BY od.fecha_reporte
 		),
 		estadias AS (
 			SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(salida_at, NOW()) - ingreso_at)) / 86400.0), 0) AS estadia_prom
 			FROM public.partes_diarios
-			WHERE establecimiento_id = $1
+			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
 			  AND estado_operativo = 'ACTIVO'
 			  AND DATE(ingreso_at) BETWEEN $2 AND $3
 		)
@@ -824,7 +827,7 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimien
 			COALESCE((SELECT COUNT(DISTINCT fecha_reporte) FROM ocupacion_diaria), 0) AS dias_con_datos`
 
 	var res domain.ResumenEstadisticas
-	err := r.statsPool.QueryRow(ctx, sql, establecimientoID, desde, hasta).Scan(
+	err := r.statsPool.QueryRow(ctx, sql, estParam(establecimientoID), desde, hasta).Scan(
 		&res.TotalHuespedes,
 		&res.TotalExtranjeros,
 		&res.OcupacionPromedio,
@@ -846,7 +849,7 @@ func (r *ParteDiarioRepo) Nacionalidades(ctx context.Context, establecimientoID 
 		WITH totales AS (
 			SELECT pais_id, pais_nombre, SUM(cantidad_ingresos) AS cantidad
 			FROM public.vw_estadistica_ingresos
-			WHERE establecimiento_id = $1
+			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
 			  AND fecha_reporte BETWEEN $2 AND $3
 			GROUP BY pais_id, pais_nombre
 		),
@@ -857,7 +860,7 @@ func (r *ParteDiarioRepo) Nacionalidades(ctx context.Context, establecimientoID 
 		ORDER BY t.cantidad DESC
 		LIMIT 10`
 
-	rows, err := r.statsPool.Query(ctx, sql, establecimientoID, desde, hasta)
+	rows, err := r.statsPool.Query(ctx, sql, estParam(establecimientoID), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("nacionalidades: %w", err)
 	}
@@ -895,13 +898,13 @@ func (r *ParteDiarioRepo) MotivosViaje(ctx context.Context, establecimientoID st
 		       COUNT(*)                             AS cantidad
 		FROM public.partes_diarios pd
 		LEFT JOIN public.motivos_viaje mv ON mv.id = pd.motivo_viaje_id
-		WHERE pd.establecimiento_id = $1
+		WHERE ($1::uuid IS NULL OR pd.establecimiento_id = $1::uuid)
 		  AND pd.fecha_reporte BETWEEN $2 AND $3
 		  AND pd.estado_operativo = 'ACTIVO'
 		GROUP BY periodo, mv.id, mv.nombre
 		ORDER BY periodo ASC, cantidad DESC`, periodoExpr)
 
-	rows, err := r.statsPool.Query(ctx, query, establecimientoID, desde, hasta)
+	rows, err := r.statsPool.Query(ctx, query, estParam(establecimientoID), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("motivos viaje: %w", err)
 	}
@@ -939,17 +942,17 @@ func (r *ParteDiarioRepo) MotivosViaje(ctx context.Context, establecimientoID st
 func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, establecimientoID string, desde, hasta time.Time) ([]domain.TipoHabitacionStat, error) {
 	const sql = `
 		WITH capacidad AS (
-			SELECT hab_tipo_snapshot,
+			SELECT tipo_habitacion,
 			       SUM(capacidad_calculada) AS total_camas
 			FROM public.habitaciones_replica_cache
-			WHERE establecimiento_id = $1
-			GROUP BY hab_tipo_snapshot
+			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
+			GROUP BY tipo_habitacion
 		),
 		ocupadas AS (
-			SELECT hab_tipo_snapshot,
+			SELECT hab_tipo_snapshot AS tipo_habitacion,
 			       COUNT(DISTINCT habitacion_id) AS ocupadas_promedio
 			FROM public.partes_diarios
-			WHERE establecimiento_id = $1
+			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
 			  AND fecha_reporte BETWEEN $2 AND $3
 			  AND estado_operativo = 'ACTIVO'
 			  AND ingreso_at < (fecha_reporte + INTERVAL '1 day')
@@ -958,17 +961,17 @@ func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, establecimientoID
 		),
 		dist_total AS (SELECT COALESCE(SUM(total_camas), 0) AS total FROM capacidad)
 		SELECT
-			c.hab_tipo_snapshot,
+			c.tipo_habitacion,
 			c.total_camas,
 			COALESCE(o.ocupadas_promedio, 0),
 			ROUND(COALESCE(o.ocupadas_promedio, 0)::numeric / NULLIF(c.total_camas, 0) * 100, 1),
 			ROUND(c.total_camas::numeric / NULLIF(dt.total, 0) * 100, 1)
 		FROM capacidad c
-		LEFT JOIN ocupadas o ON o.hab_tipo_snapshot = c.hab_tipo_snapshot
+		LEFT JOIN ocupadas o ON o.tipo_habitacion = c.tipo_habitacion
 		CROSS JOIN dist_total dt
 		ORDER BY c.total_camas DESC`
 
-	rows, err := r.statsPool.Query(ctx, sql, establecimientoID, desde, hasta)
+	rows, err := r.statsPool.Query(ctx, sql, estParam(establecimientoID), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("tipos habitacion: %w", err)
 	}
@@ -986,4 +989,14 @@ func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, establecimientoID
 		results = []domain.TipoHabitacionStat{}
 	}
 	return results, rows.Err()
+}
+
+// estParam convierte un establecimiento_id string a interface{} para pgx.
+// Retorna nil (NULL en SQL) cuando el ID está vacío, lo que hace que la cláusula
+// WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid) incluya todos los establecimientos.
+func estParam(id string) interface{} {
+	if id == "" {
+		return nil
+	}
+	return id
 }
