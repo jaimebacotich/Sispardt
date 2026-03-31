@@ -258,19 +258,8 @@ func NewEstadisticasHandler(svc *service.ParteDiarioService) *EstadisticasHandle
 }
 
 func (h *EstadisticasHandler) OcupacionDiaria(w http.ResponseWriter, r *http.Request) {
-	claims := auth.FromContext(r.Context())
-	estID := r.URL.Query().Get("establecimiento_id")
-	if claims.HasRole(auth.RoleRecepcionista) {
-		estID = claims.EstablecimientoID
-	}
-	if estID == "" {
-		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
-		return
-	}
-	desde := r.URL.Query().Get("fecha_desde")
-	hasta := r.URL.Query().Get("fecha_hasta")
-	if desde == "" || hasta == "" {
-		jsonError(w, http.StatusBadRequest, "fecha_desde y fecha_hasta son requeridas")
+	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	if !ok {
 		return
 	}
 	result, err := h.svc.OcupacionDiaria(r.Context(), estID, desde, hasta)
@@ -279,6 +268,83 @@ func (h *EstadisticasHandler) OcupacionDiaria(w http.ResponseWriter, r *http.Req
 		return
 	}
 	jsonOK(w, result)
+}
+
+func (h *EstadisticasHandler) Resumen(w http.ResponseWriter, r *http.Request) {
+	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.svc.ResumenEstadisticas(r.Context(), estID, desde, hasta)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+func (h *EstadisticasHandler) Nacionalidades(w http.ResponseWriter, r *http.Request) {
+	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.svc.Nacionalidades(r.Context(), estID, desde, hasta)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+func (h *EstadisticasHandler) MotivosViaje(w http.ResponseWriter, r *http.Request) {
+	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	if !ok {
+		return
+	}
+	agrupacion := r.URL.Query().Get("agrupacion")
+	if agrupacion == "" {
+		agrupacion = "mes"
+	}
+	result, err := h.svc.MotivosViaje(r.Context(), estID, desde, hasta, agrupacion)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+func (h *EstadisticasHandler) TiposHabitacion(w http.ResponseWriter, r *http.Request) {
+	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.svc.TiposHabitacion(r.Context(), estID, desde, hasta)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
+// parseStatsParams extrae y valida establecimiento_id, fecha_desde y fecha_hasta.
+// Para recepcionistas toma el establecimiento del token JWT.
+func (h *EstadisticasHandler) parseStatsParams(w http.ResponseWriter, r *http.Request) (estID, desde, hasta string, ok bool) {
+	claims := auth.FromContext(r.Context())
+	estID = r.URL.Query().Get("establecimiento_id")
+	if claims.HasRole(auth.RoleRecepcionista) {
+		estID = claims.EstablecimientoID
+	}
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
+		return "", "", "", false
+	}
+	desde = r.URL.Query().Get("fecha_desde")
+	hasta = r.URL.Query().Get("fecha_hasta")
+	if desde == "" || hasta == "" {
+		jsonError(w, http.StatusBadRequest, "fecha_desde y fecha_hasta son requeridas")
+		return "", "", "", false
+	}
+	return estID, desde, hasta, true
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

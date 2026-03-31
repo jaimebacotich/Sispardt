@@ -1,6 +1,7 @@
 import { cn, formatNumber } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatCardProps {
   label: string;
@@ -12,6 +13,7 @@ interface StatCardProps {
   suffix?: string;
   compact?: boolean;
   className?: string;
+  isLoading?: boolean;
 }
 
 export function StatCard({
@@ -24,9 +26,22 @@ export function StatCard({
   suffix,
   compact = false,
   className,
+  isLoading = false,
 }: StatCardProps) {
   const formattedValue =
     typeof value === "number" ? formatNumber(value) : value;
+
+  if (isLoading) {
+    return (
+      <div className={cn("bg-card rounded-xl border border-border shadow-sm flex items-start", compact ? "p-3 gap-2.5" : "p-5 gap-4", className)}>
+        <Skeleton className={compact ? "w-8 h-8 rounded-lg" : "w-11 h-11 rounded-xl"} />
+        <div className="flex-1 space-y-1.5">
+          <Skeleton className="h-2.5 w-16" />
+          <Skeleton className="h-5 w-12" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

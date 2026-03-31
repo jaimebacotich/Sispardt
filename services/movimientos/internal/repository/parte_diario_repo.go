@@ -770,3 +770,220 @@ func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, establecimientoID
 	}
 	return results, rows.Err()
 }
+
+func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimientoID string, desde, hasta time.Time) (domain.ResumenEstadisticas, error) {
+	const sql = `
+		WITH capacidad AS (
+			SELECT COALESCE(capacidad_total, 0) AS capacidad_total
+			FROM public.vw_capacidad_establecimiento
+			WHERE establecimiento_id = $1
+		),
+		pernoctes AS (
+			SELECT
+				COUNT(*) FILTER (WHERE ingreso_at < (fecha_reporte + INTERVAL '1 day')
+				  AND (salida_at IS NULL OR salida_at >= (fecha_reporte + INTERVAL '1 day')))   AS total_pernoctes,
+				COUNT(*) FILTER (WHERE estado_operativo = 'ACTIVO'
+				  AND DATE(ingreso_at) BETWEEN $2 AND $3)                                       AS total_checkins,
+				COUNT(*) FILTER (WHERE estado_operativo = 'ACTIVO'
+				  AND salida_at IS NOT NULL
+				  AND DATE(salida_at) BETWEEN $2 AND $3)                                        AS total_checkouts,
+				COUNT(*) FILTER (WHERE estado_operativo = 'ACTIVO'
+				  AND pais_procedencia_id NOT IN (
+				      SELECT id FROM public.paises_replica_cache WHERE codigo_iso = 'BO'))      AS total_extranjeros
+			FROM public.partes_diarios
+			WHERE establecimiento_id = $1
+			  AND fecha_reporte BETWEEN $2 AND $3
+			  AND estado_operativo = 'ACTIVO'
+		),
+		ocupacion_diaria AS (
+			SELECT od.fecha_reporte,
+			       od.total_huespedes,
+			       COALESCE((SELECT capacidad_total FROM capacidad), 0) AS capacidad_total
+			FROM public.vw_ocupacion_diaria od
+			WHERE od.establecimiento_id = $1
+			  AND od.fecha_reporte BETWEEN $2 AND $3
+		),
+		estadias AS (
+			SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(salida_at, NOW()) - ingreso_at)) / 86400.0), 0) AS estadia_prom
+			FROM public.partes_diarios
+			WHERE establecimiento_id = $1
+			  AND estado_operativo = 'ACTIVO'
+			  AND DATE(ingreso_at) BETWEEN $2 AND $3
+		)
+		SELECT
+			(SELECT total_checkins    FROM pernoctes)  AS total_huespedes,
+			(SELECT total_extranjeros FROM pernoctes)  AS total_extranjeros,
+			COALESCE((SELECT AVG(CASE WHEN od.capacidad_total > 0
+			     THEN od.total_huespedes::float / od.capacidad_total * 100.0 END)
+			     FROM ocupacion_diaria od), 0)         AS ocupacion_promedio,
+			(SELECT estadia_prom FROM estadias)        AS estadia_prom,
+			(SELECT total_checkins   FROM pernoctes)   AS total_checkins,
+			(SELECT total_checkouts  FROM pernoctes)   AS total_checkouts,
+			(SELECT total_pernoctes  FROM pernoctes)   AS total_pernoctes,
+			COALESCE((SELECT capacidad_total FROM capacidad), 0) AS capacidad_total,
+			COALESCE((SELECT COUNT(DISTINCT fecha_reporte) FROM ocupacion_diaria), 0) AS dias_con_datos`
+
+	var res domain.ResumenEstadisticas
+	err := r.statsPool.QueryRow(ctx, sql, establecimientoID, desde, hasta).Scan(
+		&res.TotalHuespedes,
+		&res.TotalExtranjeros,
+		&res.OcupacionPromedio,
+		&res.EstadiaProm,
+		&res.TotalCheckins,
+		&res.TotalCheckouts,
+		&res.TotalPernoctes,
+		&res.CapacidadTotal,
+		&res.DiasConDatos,
+	)
+	if err != nil {
+		return domain.ResumenEstadisticas{}, fmt.Errorf("resumen estadisticas: %w", err)
+	}
+	return res, nil
+}
+
+func (r *ParteDiarioRepo) Nacionalidades(ctx context.Context, establecimientoID string, desde, hasta time.Time) ([]domain.NacionalidadStat, error) {
+	const sql = `
+		WITH totales AS (
+			SELECT pais_id, pais_nombre, SUM(cantidad_ingresos) AS cantidad
+			FROM public.vw_estadistica_ingresos
+			WHERE establecimiento_id = $1
+			  AND fecha_reporte BETWEEN $2 AND $3
+			GROUP BY pais_id, pais_nombre
+		),
+		gran_total AS (SELECT COALESCE(SUM(cantidad), 0) AS total FROM totales)
+		SELECT t.pais_id, t.pais_nombre, t.cantidad,
+		       ROUND(t.cantidad::numeric / NULLIF(gt.total, 0) * 100, 2)
+		FROM totales t, gran_total gt
+		ORDER BY t.cantidad DESC
+		LIMIT 10`
+
+	rows, err := r.statsPool.Query(ctx, sql, establecimientoID, desde, hasta)
+	if err != nil {
+		return nil, fmt.Errorf("nacionalidades: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.NacionalidadStat
+	for rows.Next() {
+		var n domain.NacionalidadStat
+		if err := rows.Scan(&n.PaisID, &n.PaisNombre, &n.CantidadIngresos, &n.Porcentaje); err != nil {
+			return nil, fmt.Errorf("scan nacionalidades: %w", err)
+		}
+		results = append(results, n)
+	}
+	if results == nil {
+		results = []domain.NacionalidadStat{}
+	}
+	return results, rows.Err()
+}
+
+func (r *ParteDiarioRepo) MotivosViaje(ctx context.Context, establecimientoID string, desde, hasta time.Time, agrupacion string) ([]domain.MotivosPeriodo, error) {
+	var periodoExpr string
+	switch agrupacion {
+	case "dia":
+		periodoExpr = "TO_CHAR(fecha_reporte, 'YYYY-MM-DD')"
+	case "semana":
+		periodoExpr = "TO_CHAR(fecha_reporte, 'IYYY-IW')"
+	default:
+		periodoExpr = "TO_CHAR(fecha_reporte, 'YYYY-MM')"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT %s AS periodo,
+		       mv.id                                AS motivo_id,
+		       COALESCE(mv.nombre, 'Sin dato')      AS motivo_nombre,
+		       COUNT(*)                             AS cantidad
+		FROM public.partes_diarios pd
+		LEFT JOIN public.motivos_viaje mv ON mv.id = pd.motivo_viaje_id
+		WHERE pd.establecimiento_id = $1
+		  AND pd.fecha_reporte BETWEEN $2 AND $3
+		  AND pd.estado_operativo = 'ACTIVO'
+		GROUP BY periodo, mv.id, mv.nombre
+		ORDER BY periodo ASC, cantidad DESC`, periodoExpr)
+
+	rows, err := r.statsPool.Query(ctx, query, establecimientoID, desde, hasta)
+	if err != nil {
+		return nil, fmt.Errorf("motivos viaje: %w", err)
+	}
+	defer rows.Close()
+
+	periodMap := make(map[string]*domain.MotivosPeriodo)
+	var order []string
+	for rows.Next() {
+		var periodo, motivoNombre string
+		var motivoID *int
+		var cantidad int64
+		if err := rows.Scan(&periodo, &motivoID, &motivoNombre, &cantidad); err != nil {
+			return nil, fmt.Errorf("scan motivos: %w", err)
+		}
+		if _, ok := periodMap[periodo]; !ok {
+			periodMap[periodo] = &domain.MotivosPeriodo{Periodo: periodo}
+			order = append(order, periodo)
+		}
+		periodMap[periodo].Motivos = append(periodMap[periodo].Motivos, domain.MotivoMes{
+			MotivoID:     motivoID,
+			MotivoNombre: motivoNombre,
+			Cantidad:     cantidad,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	results := make([]domain.MotivosPeriodo, 0, len(order))
+	for _, p := range order {
+		results = append(results, *periodMap[p])
+	}
+	return results, nil
+}
+
+func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, establecimientoID string, desde, hasta time.Time) ([]domain.TipoHabitacionStat, error) {
+	const sql = `
+		WITH capacidad AS (
+			SELECT hab_tipo_snapshot,
+			       SUM(capacidad_calculada) AS total_camas
+			FROM public.habitaciones_replica_cache
+			WHERE establecimiento_id = $1
+			GROUP BY hab_tipo_snapshot
+		),
+		ocupadas AS (
+			SELECT hab_tipo_snapshot,
+			       COUNT(DISTINCT habitacion_id) AS ocupadas_promedio
+			FROM public.partes_diarios
+			WHERE establecimiento_id = $1
+			  AND fecha_reporte BETWEEN $2 AND $3
+			  AND estado_operativo = 'ACTIVO'
+			  AND ingreso_at < (fecha_reporte + INTERVAL '1 day')
+			  AND (salida_at IS NULL OR salida_at >= (fecha_reporte + INTERVAL '1 day'))
+			GROUP BY hab_tipo_snapshot
+		),
+		dist_total AS (SELECT COALESCE(SUM(total_camas), 0) AS total FROM capacidad)
+		SELECT
+			c.hab_tipo_snapshot,
+			c.total_camas,
+			COALESCE(o.ocupadas_promedio, 0),
+			ROUND(COALESCE(o.ocupadas_promedio, 0)::numeric / NULLIF(c.total_camas, 0) * 100, 1),
+			ROUND(c.total_camas::numeric / NULLIF(dt.total, 0) * 100, 1)
+		FROM capacidad c
+		LEFT JOIN ocupadas o ON o.hab_tipo_snapshot = c.hab_tipo_snapshot
+		CROSS JOIN dist_total dt
+		ORDER BY c.total_camas DESC`
+
+	rows, err := r.statsPool.Query(ctx, sql, establecimientoID, desde, hasta)
+	if err != nil {
+		return nil, fmt.Errorf("tipos habitacion: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.TipoHabitacionStat
+	for rows.Next() {
+		var t domain.TipoHabitacionStat
+		if err := rows.Scan(&t.TipoHabitacion, &t.TotalCamas, &t.TotalOcupadas, &t.PorcentajeOcupacion, &t.PorcentajeDistribucion); err != nil {
+			return nil, fmt.Errorf("scan tipos habitacion: %w", err)
+		}
+		results = append(results, t)
+	}
+	if results == nil {
+		results = []domain.TipoHabitacionStat{}
+	}
+	return results, rows.Err()
+}

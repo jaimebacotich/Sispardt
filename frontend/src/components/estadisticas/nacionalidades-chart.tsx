@@ -10,15 +10,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-
-const MOCK_DATA = [
-  { pais: "Bolivia", cantidad: 342 },
-  { pais: "Argentina", cantidad: 198 },
-  { pais: "Brasil", cantidad: 124 },
-  { pais: "Chile", cantidad: 98 },
-  { pais: "Perú", cantidad: 76 },
-  { pais: "Otros", cantidad: 58 },
-];
+import { Skeleton } from "@/components/ui/skeleton";
+import type { NacionalidadStat } from "@/types/api";
 
 const COLORS = [
   "hsl(var(--primary))",
@@ -29,11 +22,26 @@ const COLORS = [
   "hsl(var(--muted-foreground))",
 ];
 
-export function NacionalidadesChart() {
+interface NacionalidadesChartProps {
+  data: NacionalidadStat[];
+  isLoading: boolean;
+}
+
+export function NacionalidadesChart({ data, isLoading }: NacionalidadesChartProps) {
+  if (isLoading) {
+    return <Skeleton className="w-full h-[220px]" />;
+  }
+
+  const chartData = data.map((d) => ({
+    pais: d.paisNombre,
+    cantidad: d.cantidadIngresos,
+    porcentaje: d.porcentaje,
+  }));
+
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart
-        data={MOCK_DATA}
+        data={chartData}
         layout="vertical"
         margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
       >
@@ -54,7 +62,7 @@ export function NacionalidadesChart() {
           tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
           axisLine={false}
           tickLine={false}
-          width={62}
+          width={70}
         />
         <Tooltip
           contentStyle={{
@@ -63,10 +71,13 @@ export function NacionalidadesChart() {
             borderRadius: "8px",
             fontSize: "12px",
           }}
-          formatter={(v: unknown) => [v as number, "Huéspedes"]}
+          formatter={(v: unknown, _n: unknown, props: { payload?: { porcentaje?: number } }) => [
+            `${v as number} (${props.payload?.porcentaje ?? 0}%)`,
+            "Huéspedes",
+          ]}
         />
         <Bar dataKey="cantidad" radius={[0, 4, 4, 0]}>
-          {MOCK_DATA.map((_, i) => (
+          {chartData.map((_, i) => (
             <Cell key={i} fill={COLORS[i % COLORS.length]} />
           ))}
         </Bar>

@@ -6,6 +6,10 @@ import type {
   CierreDiario,
   FechaPendiente,
   OcupacionDiaria,
+  ResumenEstadisticas,
+  NacionalidadStat,
+  MotivosPeriodo,
+  TipoHabitacionStat,
   PagedResult,
   CatalogosMovimientos,
 } from "@/types/api";
@@ -89,5 +93,54 @@ export const movimientosApi = {
     });
     if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
     return apiClient.get<OcupacionDiaria[]>(`/api/v1/estadisticas/ocupacion?${q}`, token);
+  },
+
+  getResumen: (
+    token: string,
+    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }
+  ) => {
+    const q = new URLSearchParams({
+      establecimiento_id: params.establecimientoId,
+      fecha_desde: params.fechaDesde,
+      fecha_hasta: params.fechaHasta,
+    });
+    return apiClient.get<ResumenEstadisticas>(`/api/v1/estadisticas/resumen?${q}`, token);
+  },
+
+  getNacionalidades: (
+    token: string,
+    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }
+  ) => {
+    const q = new URLSearchParams({
+      establecimiento_id: params.establecimientoId,
+      fecha_desde: params.fechaDesde,
+      fecha_hasta: params.fechaHasta,
+    });
+    return apiClient.get<NacionalidadStat[]>(`/api/v1/estadisticas/nacionalidades?${q}`, token);
+  },
+
+  getMotivosViaje: (
+    token: string,
+    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string; agrupacion?: string }
+  ) => {
+    const q = new URLSearchParams({
+      establecimiento_id: params.establecimientoId,
+      fecha_desde: params.fechaDesde,
+      fecha_hasta: params.fechaHasta,
+    });
+    if (params.agrupacion) q.set("agrupacion", params.agrupacion);
+    return apiClient.get<MotivosPeriodo[]>(`/api/v1/estadisticas/motivos?${q}`, token);
+  },
+
+  getTiposHabitacion: (
+    token: string,
+    params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }
+  ) => {
+    const q = new URLSearchParams({
+      establecimiento_id: params.establecimientoId,
+      fecha_desde: params.fechaDesde,
+      fecha_hasta: params.fechaHasta,
+    });
+    return apiClient.get<TipoHabitacionStat[]>(`/api/v1/estadisticas/tipos-habitacion?${q}`, token);
   },
 };

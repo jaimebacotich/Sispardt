@@ -376,7 +376,7 @@ CREATE VIEW public.vw_estadistica_consolidada AS
         AND NOT (i.localidad_id IS DISTINCT FROM p.localidad_id);
 
 CREATE VIEW public.vw_ocupacion_diaria AS
-    SELECT establecimiento_id, fecha_reporte, count(*) AS ocupacion
+    SELECT establecimiento_id, fecha_reporte, count(*) AS total_huespedes
     FROM public.partes_diarios
     WHERE ingreso_at < (fecha_reporte + '1 day'::interval)
       AND (salida_at IS NULL OR salida_at >= (fecha_reporte + '1 day'::interval))

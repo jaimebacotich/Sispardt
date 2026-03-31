@@ -234,6 +234,44 @@ type OcupacionDiaria struct {
 	PorcentajeOcupacion *float64 `json:"porcentajeOcupacion,omitempty"`
 }
 
+type ResumenEstadisticas struct {
+	TotalHuespedes    int64   `json:"totalHuespedes"`
+	TotalExtranjeros  int64   `json:"totalExtranjeros"`
+	OcupacionPromedio float64 `json:"ocupacionPromedio"`
+	EstadiaProm       float64 `json:"estadiaPromedioDias"`
+	TotalCheckins     int64   `json:"totalCheckins"`
+	TotalCheckouts    int64   `json:"totalCheckouts"`
+	TotalPernoctes    int64   `json:"totalPernoctes"`
+	CapacidadTotal    int64   `json:"capacidadTotal"`
+	DiasConDatos      int     `json:"diasConDatos"`
+}
+
+type NacionalidadStat struct {
+	PaisID           int     `json:"paisId"`
+	PaisNombre       string  `json:"paisNombre"`
+	CantidadIngresos int64   `json:"cantidadIngresos"`
+	Porcentaje       float64 `json:"porcentaje"`
+}
+
+type MotivoMes struct {
+	MotivoID     *int   `json:"motivoId"`
+	MotivoNombre string `json:"motivoNombre"`
+	Cantidad     int64  `json:"cantidad"`
+}
+
+type MotivosPeriodo struct {
+	Periodo string      `json:"periodo"`
+	Motivos []MotivoMes `json:"motivos"`
+}
+
+type TipoHabitacionStat struct {
+	TipoHabitacion       string  `json:"tipoHabitacion"`
+	TotalCamas           int64   `json:"totalCamas"`
+	TotalOcupadas        int64   `json:"totalOcupadas"`
+	PorcentajeOcupacion  float64 `json:"porcentajeOcupacion"`
+	PorcentajeDistribucion float64 `json:"porcentajeDistribucion"`
+}
+
 // ─── Parámetros de consulta ───────────────────────────────────────────────────
 
 type ListPartesParams struct {

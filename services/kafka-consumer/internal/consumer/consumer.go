@@ -18,13 +18,15 @@ var managedTopics = []string{
 	"sispardt.public.divisiones_principales",
 	"sispardt.public.divisiones_secundarias",
 	"sispardt.public.localidades",
+	"sispardt.public.tipo_habitaciones",
 	"sispardt.public.habitaciones",
 	"sispardt.public.habitacion_camas",
 }
 
 type Consumer struct {
-	reader *kafka.Reader
-	repo   *repository.ReplicaRepo
+	reader        *kafka.Reader
+	repo          *repository.ReplicaRepo
+	tiposHab      map[int]string // id → nombre, cache en memoria
 }
 
 func New(brokers []string, groupID string, repo *repository.ReplicaRepo) *Consumer {
@@ -40,7 +42,7 @@ func New(brokers []string, groupID string, repo *repository.ReplicaRepo) *Consum
 		ReadLagInterval:       -1,
 		WatchPartitionChanges: true,
 	})
-	return &Consumer{reader: r, repo: repo}
+	return &Consumer{reader: r, repo: repo, tiposHab: make(map[int]string)}
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
@@ -105,6 +107,8 @@ func (c *Consumer) handle(ctx context.Context, msg kafka.Message) error {
 		return c.handleDivisionSecundaria(ctx, env.Op, activeRaw)
 	case "sispardt.public.localidades":
 		return c.handleLocalidad(ctx, env.Op, activeRaw)
+	case "sispardt.public.tipo_habitaciones":
+		return c.handleTipoHabitacion(env.Op, activeRaw)
 	case "sispardt.public.habitaciones":
 		return c.handleHabitacion(ctx, env.Op, activeRaw)
 	case "sispardt.public.habitacion_camas":
@@ -149,6 +153,23 @@ func (c *Consumer) handleLocalidad(ctx context.Context, op string, raw json.RawM
 	return c.repo.UpsertLocalidad(ctx, rec)
 }
 
+func (c *Consumer) handleTipoHabitacion(op string, raw json.RawMessage) error {
+	var rec struct {
+		ID          int    `json:"id"`
+		Nombre      string `json:"nombre"`
+		EliminadoAt *int64 `json:"eliminado_at"`
+	}
+	if err := json.Unmarshal(raw, &rec); err != nil {
+		return err
+	}
+	if op == OpDelete || rec.EliminadoAt != nil {
+		delete(c.tiposHab, rec.ID)
+	} else {
+		c.tiposHab[rec.ID] = rec.Nombre
+	}
+	return nil
+}
+
 func (c *Consumer) handleHabitacion(ctx context.Context, op string, raw json.RawMessage) error {
 	rec, err := models.UnmarshalHabitacion(raw)
 	if err != nil || rec == nil {
@@ -157,7 +178,12 @@ func (c *Consumer) handleHabitacion(ctx context.Context, op string, raw json.Raw
 	if op == OpDelete || rec.EliminadoAt != nil {
 		return c.repo.UpsertHabitacion(ctx, rec, "desconocido", 0)
 	}
-	tipoNombre := fmt.Sprintf("tipo_%d", safeInt(rec.TipoHabitacionID))
+	tipoNombre := "desconocido"
+	if rec.TipoHabitacionID != nil {
+		if nombre, ok := c.tiposHab[*rec.TipoHabitacionID]; ok {
+			tipoNombre = nombre
+		}
+	}
 	return c.repo.UpsertHabitacion(ctx, rec, tipoNombre, 0)
 }
 

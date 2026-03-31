@@ -10,14 +10,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-
-const MOCK_DATA = [
-  { tipo: "Simple", ocupacion: 78 },
-  { tipo: "Doble", ocupacion: 85 },
-  { tipo: "Triple", ocupacion: 62 },
-  { tipo: "Suite", ocupacion: 91 },
-  { tipo: "Matrimonial", ocupacion: 74 },
-];
+import { Skeleton } from "@/components/ui/skeleton";
+import type { TipoHabitacionStat } from "@/types/api";
 
 const COLORS = [
   "hsl(var(--primary))",
@@ -27,11 +21,25 @@ const COLORS = [
   "var(--chart-5)",
 ];
 
-export function OcupacionTipoChart() {
+interface OcupacionTipoChartProps {
+  data: TipoHabitacionStat[];
+  isLoading: boolean;
+}
+
+export function OcupacionTipoChart({ data, isLoading }: OcupacionTipoChartProps) {
+  if (isLoading) {
+    return <Skeleton className="w-full h-[220px]" />;
+  }
+
+  const chartData = data.map((d) => ({
+    tipo: d.tipoHabitacion,
+    ocupacion: d.porcentajeOcupacion,
+  }));
+
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart
-        data={MOCK_DATA}
+        data={chartData}
         margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
       >
         <CartesianGrid
@@ -62,7 +70,7 @@ export function OcupacionTipoChart() {
           formatter={(v: unknown) => [`${v as number}%`, "Ocupación"]}
         />
         <Bar dataKey="ocupacion" radius={[4, 4, 0, 0]}>
-          {MOCK_DATA.map((_, i) => (
+          {chartData.map((_, i) => (
             <Cell key={i} fill={COLORS[i % COLORS.length]} />
           ))}
         </Bar>

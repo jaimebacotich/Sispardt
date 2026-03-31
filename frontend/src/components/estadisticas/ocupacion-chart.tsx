@@ -9,36 +9,30 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
-
-// Mock: últimos 30 días de ocupación
-function generateData() {
-  const data = [];
-  const now = new Date("2026-03-08");
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    data.push({
-      fecha: d.toISOString().slice(0, 10),
-      huespedes: Math.floor(Math.random() * 400 + 400),
-      ocupacion: Math.floor(Math.random() * 40 + 55),
-    });
-  }
-  return data;
-}
-
-const MOCK_DATA = generateData();
+import type { OcupacionDiaria } from "@/types/api";
 
 interface OcupacionChartProps {
-  periodo: string;
+  data: OcupacionDiaria[];
+  isLoading: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function OcupacionChart({ periodo: _periodo }: OcupacionChartProps) {
+export function OcupacionChart({ data, isLoading }: OcupacionChartProps) {
+  if (isLoading) {
+    return <Skeleton className="w-full h-[220px]" />;
+  }
+
+  const chartData = data.map((d) => ({
+    fecha: d.fechaReporte,
+    huespedes: d.totalHuespedes,
+    ocupacion: d.porcentajeOcupacion ?? 0,
+  }));
+
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart
-        data={MOCK_DATA}
+        data={chartData}
         margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
       >
         <CartesianGrid

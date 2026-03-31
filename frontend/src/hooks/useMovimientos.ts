@@ -17,6 +17,10 @@ export const MOV_KEYS = {
   partesFiltros:       (f: object) => ["partes", f] as const,
   habitacionesEstado:  ["habitaciones-estado"] as const,
   ocupacion:           (params: object) => ["ocupacion", params] as const,
+  resumen:             (params: object) => ["estadisticas-resumen", params] as const,
+  nacionalidades:      (params: object) => ["estadisticas-nacionalidades", params] as const,
+  motivosViaje:        (params: object) => ["estadisticas-motivos", params] as const,
+  tiposHabitacion:     (params: object) => ["estadisticas-tipos", params] as const,
   cierres:             ["cierres"] as const,
   cierrePorFecha:      (fecha: string) => ["cierres", fecha] as const,
   fechasPendientes:    ["cierres-pendientes"] as const,
@@ -236,12 +240,57 @@ export function useHabitacionesEstadoEnFecha(fecha: string) {
 }
 
 // ── Estadísticas de ocupación ──────────────────────────────────────────────
-export function useOcupacion(fechaDesde: string, fechaHasta: string) {
+export function useOcupacion(establecimientoId: string, fechaDesde: string, fechaHasta: string) {
   const { accessToken } = useAuth();
   return useQuery({
-    queryKey: MOV_KEYS.ocupacion({ fechaDesde, fechaHasta }),
+    queryKey: MOV_KEYS.ocupacion({ establecimientoId, fechaDesde, fechaHasta }),
     queryFn: () =>
-      movimientosApi.getOcupacion(accessToken!, { fechaDesde, fechaHasta }),
-    enabled: !USE_MOCK && !!accessToken,
+      movimientosApi.getOcupacion(accessToken!, { establecimientoId, fechaDesde, fechaHasta }),
+    enabled: !USE_MOCK && !!accessToken && !!establecimientoId && !!fechaDesde && !!fechaHasta,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Resumen KPI ────────────────────────────────────────────────────────────
+export function useResumenEstadisticas(params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: MOV_KEYS.resumen(params),
+    queryFn: () => movimientosApi.getResumen(accessToken!, params),
+    enabled: !USE_MOCK && !!accessToken && !!params.establecimientoId && !!params.fechaDesde && !!params.fechaHasta,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Top Nacionalidades ─────────────────────────────────────────────────────
+export function useNacionalidades(params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: MOV_KEYS.nacionalidades(params),
+    queryFn: () => movimientosApi.getNacionalidades(accessToken!, params),
+    enabled: !USE_MOCK && !!accessToken && !!params.establecimientoId && !!params.fechaDesde && !!params.fechaHasta,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Motivos de Viaje ───────────────────────────────────────────────────────
+export function useMotivosViaje(params: { establecimientoId: string; fechaDesde: string; fechaHasta: string; agrupacion?: string }) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: MOV_KEYS.motivosViaje(params),
+    queryFn: () => movimientosApi.getMotivosViaje(accessToken!, params),
+    enabled: !USE_MOCK && !!accessToken && !!params.establecimientoId && !!params.fechaDesde && !!params.fechaHasta,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Tipos de Habitación ────────────────────────────────────────────────────
+export function useTiposHabitacion(params: { establecimientoId: string; fechaDesde: string; fechaHasta: string }) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: MOV_KEYS.tiposHabitacion(params),
+    queryFn: () => movimientosApi.getTiposHabitacion(accessToken!, params),
+    enabled: !USE_MOCK && !!accessToken && !!params.establecimientoId && !!params.fechaDesde && !!params.fechaHasta,
+    staleTime: 5 * 60 * 1000,
   });
 }

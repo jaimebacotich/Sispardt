@@ -367,19 +367,54 @@ export interface FechaPendiente {
  * Estadísticas
  * ============================================================ */
 
+/** Respuesta del endpoint GET /api/v1/estadisticas/ocupacion */
 export interface OcupacionDiaria {
-  fecha: string;
-  totalPartes: number;
+  establecimientoId: string;
+  fechaReporte: string;
   totalHuespedes: number;
-  habitacionesOcupadas: number;
-  ocupacionPorcentaje: number;
+  capacidadTotal?: number;
+  porcentajeOcupacion?: number;
 }
 
-export interface EstadisticasPeriodo {
-  ocupacionDiaria: OcupacionDiaria[];
+/** Respuesta del endpoint GET /api/v1/estadisticas/resumen */
+export interface ResumenEstadisticas {
   totalHuespedes: number;
+  totalExtranjeros: number;
   ocupacionPromedio: number;
-  topNacionalidades: { pais: string; cantidad: number; porcentaje: number }[];
+  estadiaPromedioDias: number;
+  totalCheckins: number;
+  totalCheckouts: number;
+  totalPernoctes: number;
+  capacidadTotal: number;
+  diasConDatos: number;
+}
+
+/** Respuesta del endpoint GET /api/v1/estadisticas/nacionalidades */
+export interface NacionalidadStat {
+  paisId: number;
+  paisNombre: string;
+  cantidadIngresos: number;
+  porcentaje: number;
+}
+
+/** Respuesta del endpoint GET /api/v1/estadisticas/motivos */
+export interface MotivoMes {
+  motivoId: number | null;
+  motivoNombre: string;
+  cantidad: number;
+}
+export interface MotivosPeriodo {
+  periodo: string;
+  motivos: MotivoMes[];
+}
+
+/** Respuesta del endpoint GET /api/v1/estadisticas/tipos-habitacion */
+export interface TipoHabitacionStat {
+  tipoHabitacion: string;
+  totalCamas: number;
+  totalOcupadas: number;
+  porcentajeOcupacion: number;
+  porcentajeDistribucion: number;
 }
 
 /* ============================================================

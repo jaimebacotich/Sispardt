@@ -109,12 +109,17 @@ func NewRouter(
 
 		// Estadísticas
 		r.Route("/api/v1/estadisticas", func(r chi.Router) {
-			r.With(auth.RequireRole(
-				auth.RoleResponsableEstadistica,
+			statsRol := auth.RequireRole(
 				auth.RoleAdminGeneral,
 				auth.RoleResponsableRegistro,
+				auth.RoleTecnicoRegistro,
 				auth.RoleRecepcionista,
-			)).Get("/ocupacion", statsHandler.OcupacionDiaria)
+			)
+			r.With(statsRol).Get("/ocupacion",        statsHandler.OcupacionDiaria)
+			r.With(statsRol).Get("/resumen",          statsHandler.Resumen)
+			r.With(statsRol).Get("/nacionalidades",   statsHandler.Nacionalidades)
+			r.With(statsRol).Get("/motivos",          statsHandler.MotivosViaje)
+			r.With(statsRol).Get("/tipos-habitacion", statsHandler.TiposHabitacion)
 		})
 
 		// Auditoría de movimientos

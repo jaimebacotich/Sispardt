@@ -198,21 +198,61 @@ func (s *ParteDiarioService) CreateCierre(ctx context.Context, userID, cerradoPo
 // ─── Estadísticas ─────────────────────────────────────────────────────────────
 
 func (s *ParteDiarioService) OcupacionDiaria(ctx context.Context, establecimientoID, desde, hasta string) ([]domain.OcupacionDiaria, error) {
-	desdeT, err := time.Parse("2006-01-02", desde)
+	desdeT, hastaT, err := parseFechas(desde, hasta)
 	if err != nil {
-		return nil, fmt.Errorf("fecha_desde inválida (use YYYY-MM-DD)")
-	}
-	hastaT, err := time.Parse("2006-01-02", hasta)
-	if err != nil {
-		return nil, fmt.Errorf("fecha_hasta inválida (use YYYY-MM-DD)")
-	}
-	if hastaT.Before(desdeT) {
-		return nil, fmt.Errorf("fecha_hasta debe ser >= fecha_desde")
+		return nil, err
 	}
 	return s.repo.OcupacionDiaria(ctx, establecimientoID, desdeT, hastaT)
 }
 
+func (s *ParteDiarioService) ResumenEstadisticas(ctx context.Context, establecimientoID, desde, hasta string) (domain.ResumenEstadisticas, error) {
+	desdeT, hastaT, err := parseFechas(desde, hasta)
+	if err != nil {
+		return domain.ResumenEstadisticas{}, err
+	}
+	return s.repo.ResumenEstadisticas(ctx, establecimientoID, desdeT, hastaT)
+}
+
+func (s *ParteDiarioService) Nacionalidades(ctx context.Context, establecimientoID, desde, hasta string) ([]domain.NacionalidadStat, error) {
+	desdeT, hastaT, err := parseFechas(desde, hasta)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Nacionalidades(ctx, establecimientoID, desdeT, hastaT)
+}
+
+func (s *ParteDiarioService) MotivosViaje(ctx context.Context, establecimientoID, desde, hasta, agrupacion string) ([]domain.MotivosPeriodo, error) {
+	desdeT, hastaT, err := parseFechas(desde, hasta)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.MotivosViaje(ctx, establecimientoID, desdeT, hastaT, agrupacion)
+}
+
+func (s *ParteDiarioService) TiposHabitacion(ctx context.Context, establecimientoID, desde, hasta string) ([]domain.TipoHabitacionStat, error) {
+	desdeT, hastaT, err := parseFechas(desde, hasta)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.TiposHabitacion(ctx, establecimientoID, desdeT, hastaT)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+func parseFechas(desde, hasta string) (time.Time, time.Time, error) {
+	desdeT, err := time.Parse("2006-01-02", desde)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("fecha_desde inválida (use YYYY-MM-DD)")
+	}
+	hastaT, err := time.Parse("2006-01-02", hasta)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("fecha_hasta inválida (use YYYY-MM-DD)")
+	}
+	if hastaT.Before(desdeT) {
+		return time.Time{}, time.Time{}, fmt.Errorf("fecha_hasta debe ser >= fecha_desde")
+	}
+	return desdeT, hastaT, nil
+}
 
 func toCierreResponse(c domain.CierreDiario) domain.CierreDiarioResponse {
 	return domain.CierreDiarioResponse{

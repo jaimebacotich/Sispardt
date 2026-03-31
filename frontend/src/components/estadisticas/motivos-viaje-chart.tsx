@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -10,48 +11,44 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { Periodo } from "./estadisticas-dashboard";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { MotivosPeriodo } from "@/types/api";
 
-const ALL_DATA = [
-  { mes: "Ene", Turismo: 245, Negocios: 89, Familiar: 67, Trabajo: 45, Otros: 32 },
-  { mes: "Feb", Turismo: 278, Negocios: 95, Familiar: 72, Trabajo: 51, Otros: 38 },
-  { mes: "Mar", Turismo: 312, Negocios: 102, Familiar: 81, Trabajo: 48, Otros: 41 },
-  { mes: "Abr", Turismo: 290, Negocios: 88, Familiar: 76, Trabajo: 43, Otros: 35 },
-  { mes: "May", Turismo: 335, Negocios: 110, Familiar: 84, Trabajo: 52, Otros: 44 },
-  { mes: "Jun", Turismo: 368, Negocios: 121, Familiar: 91, Trabajo: 57, Otros: 49 },
-  { mes: "Jul", Turismo: 421, Negocios: 134, Familiar: 98, Trabajo: 61, Otros: 53 },
-  { mes: "Ago", Turismo: 398, Negocios: 128, Familiar: 94, Trabajo: 58, Otros: 48 },
-  { mes: "Sep", Turismo: 352, Negocios: 115, Familiar: 87, Trabajo: 54, Otros: 45 },
+const COLORS = [
+  "hsl(var(--primary))",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "hsl(var(--muted-foreground))",
 ];
 
-const MOTIVOS = [
-  { key: "Turismo",  color: "hsl(var(--primary))" },
-  { key: "Negocios", color: "var(--chart-2)"       },
-  { key: "Familiar", color: "var(--chart-3)"       },
-  { key: "Trabajo",  color: "var(--chart-4)"       },
-  { key: "Otros",    color: "hsl(var(--muted-foreground))" },
-];
+interface MotivosViajeChartProps {
+  data: MotivosPeriodo[];
+  isLoading: boolean;
+}
 
-function getDataByPeriodo(periodo: Periodo) {
-  switch (periodo) {
-    case "7d":  return ALL_DATA.slice(-2);
-    case "30d": return ALL_DATA.slice(-3);
-    case "90d": return ALL_DATA.slice(-6);
-    default:    return ALL_DATA;
+export function MotivosViajeChart({ data, isLoading }: MotivosViajeChartProps) {
+  const { chartData, motivosKeys } = useMemo(() => {
+    const keysSet = new Set<string>();
+    const rows = data.map((p) => {
+      const row: Record<string, string | number> = { periodo: p.periodo };
+      for (const m of p.motivos) {
+        keysSet.add(m.motivoNombre);
+        row[m.motivoNombre] = m.cantidad;
+      }
+      return row;
+    });
+    return { chartData: rows, motivosKeys: Array.from(keysSet) };
+  }, [data]);
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-[240px]" />;
   }
-}
-
-interface Props {
-  periodo: Periodo;
-}
-
-export function MotivosViajeChart({ periodo }: Props) {
-  const data = getDataByPeriodo(periodo);
 
   return (
     <ResponsiveContainer width="100%" height={240}>
       <BarChart
-        data={data}
+        data={chartData}
         margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
         barCategoryGap="28%"
         barGap={2}
@@ -62,7 +59,7 @@ export function MotivosViajeChart({ periodo }: Props) {
           vertical={false}
         />
         <XAxis
-          dataKey="mes"
+          dataKey="periodo"
           tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
           axisLine={false}
           tickLine={false}
@@ -86,8 +83,14 @@ export function MotivosViajeChart({ periodo }: Props) {
           iconSize={8}
           wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }}
         />
-        {MOTIVOS.map(({ key, color }) => (
-          <Bar key={key} dataKey={key} fill={color} radius={[3, 3, 0, 0]} stackId="a" />
+        {motivosKeys.map((key, i) => (
+          <Bar
+            key={key}
+            dataKey={key}
+            fill={COLORS[i % COLORS.length]}
+            radius={[3, 3, 0, 0]}
+            stackId="a"
+          />
         ))}
       </BarChart>
     </ResponsiveContainer>

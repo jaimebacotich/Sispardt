@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -9,24 +10,45 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { OcupacionDiaria } from "@/types/api";
 
-const MOCK_DATA = [
-  { mes: "Ene", tasa: 58 },
-  { mes: "Feb", tasa: 65 },
-  { mes: "Mar", tasa: 72 },
-  { mes: "Abr", tasa: 69 },
-  { mes: "May", tasa: 78 },
-  { mes: "Jun", tasa: 82 },
-  { mes: "Jul", tasa: 88 },
-  { mes: "Ago", tasa: 85 },
-  { mes: "Sep", tasa: 76 },
-];
+const MES_CORTO: Record<string, string> = {
+  "01": "Ene", "02": "Feb", "03": "Mar", "04": "Abr",
+  "05": "May", "06": "Jun", "07": "Jul", "08": "Ago",
+  "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dic",
+};
 
-export function TasaOcupacionChart() {
+interface TasaOcupacionChartProps {
+  data: OcupacionDiaria[];
+  isLoading: boolean;
+}
+
+export function TasaOcupacionChart({ data, isLoading }: TasaOcupacionChartProps) {
+  const tasaMensual = useMemo(() => {
+    const byMonth: Record<string, { sum: number; count: number }> = {};
+    for (const d of data) {
+      const ym = d.fechaReporte.slice(0, 7); // "YYYY-MM"
+      if (!byMonth[ym]) byMonth[ym] = { sum: 0, count: 0 };
+      byMonth[ym].sum += d.porcentajeOcupacion ?? 0;
+      byMonth[ym].count += 1;
+    }
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([ym, { sum, count }]) => ({
+        mes: MES_CORTO[ym.slice(5, 7)] ?? ym.slice(5, 7),
+        tasa: +((sum / count)).toFixed(1),
+      }));
+  }, [data]);
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-[200px]" />;
+  }
+
   return (
     <ResponsiveContainer width="100%" height={200}>
       <LineChart
-        data={MOCK_DATA}
+        data={tasaMensual}
         margin={{ top: 8, right: 16, left: -20, bottom: 0 }}
       >
         <CartesianGrid
@@ -44,7 +66,7 @@ export function TasaOcupacionChart() {
           tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
           axisLine={false}
           tickLine={false}
-          domain={[40, 100]}
+          domain={[0, 100]}
           unit="%"
         />
         <Tooltip
