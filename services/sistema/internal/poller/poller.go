@@ -62,16 +62,28 @@ func (s *State) Read() (lastPollAt time.Time, lastErr error) {
 	return s.LastPollAt, s.LastPollError
 }
 
+// rolKCaDB mapea roles de Keycloak a nombres en la tabla roles de la BD.
+// Solo incluye los roles del sistema institucional que deben sincronizarse.
+var rolKCaDB = map[string]string{
+	"admin_general":        "rol_admin_general",
+	"responsable_registro": "rol_responsable_registro",
+	"tecnico_registro":     "rol_tecnico_registro",
+}
+
+const instUUID = "11111111-1111-1111-1111-111111111111"
+
 // Poller consulta Keycloak Admin API cada `interval` y persiste los eventos.
 type Poller struct {
-	repo     *repository.SesionesRepo
-	kcClient *keycloak.AdminClient
-	realm    string
-	interval time.Duration
-	State    *State
+	repo         *repository.SesionesRepo
+	usuariosRepo *repository.UsuarioSistemaRepo
+	kcClient     *keycloak.AdminClient
+	realm        string
+	interval     time.Duration
+	State        *State
 
 	lastTSMu sync.Mutex
 	lastTS   time.Time // cursor de la última marca procesada
+	syncDone bool      // true cuando la sincronización inicial KC→DB completó
 }
 
 func New(
@@ -87,6 +99,11 @@ func New(
 		interval: time.Duration(intervalSeconds) * time.Second,
 		State:    NewState(intervalSeconds),
 	}
+}
+
+// SetUsuariosRepo habilita la sincronización KC→DB de usuarios del sistema.
+func (p *Poller) SetUsuariosRepo(repo *repository.UsuarioSistemaRepo) {
+	p.usuariosRepo = repo
 }
 
 // Run inicia el bucle de polling. Bloquea hasta que ctx sea cancelado.
@@ -120,6 +137,10 @@ func (p *Poller) Run(ctx context.Context) {
 }
 
 func (p *Poller) runOnce(ctx context.Context) {
+	if p.usuariosRepo != nil && !p.syncDone {
+		p.syncUsuariosDesdeKeycloak(ctx)
+	}
+
 	now := time.Now()
 
 	// Ventana de solapamiento de -1 minuto para eventos desordenados
@@ -231,6 +252,64 @@ func (p *Poller) setLastTS(ts time.Time) {
 	p.lastTSMu.Lock()
 	defer p.lastTSMu.Unlock()
 	p.lastTS = ts
+}
+
+// syncUsuariosDesdeKeycloak sincroniza los usuarios institucionales de Keycloak
+// a la tabla usuarios_sistema. Se ejecuta en cada tick hasta que tenga éxito.
+func (p *Poller) syncUsuariosDesdeKeycloak(ctx context.Context) {
+	users, err := p.kcClient.ListUsers(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("poller: sync usuarios KC→DB: error listando usuarios")
+		return
+	}
+
+	found := 0
+	inserted := 0
+	for _, u := range users {
+		if !u.Enabled {
+			continue
+		}
+		estID := ""
+		if vals, ok := u.Attributes["establecimiento_id"]; ok && len(vals) > 0 {
+			estID = vals[0]
+		}
+		if estID != instUUID {
+			continue
+		}
+
+		roles, err := p.kcClient.FetchUserRoles(ctx, u.ID)
+		if err != nil {
+			log.Warn().Err(err).Str("user", u.Username).Msg("poller: sync: no se pudieron obtener roles")
+			continue
+		}
+
+		dbRol := ""
+		for _, r := range roles {
+			if mapped, ok := rolKCaDB[r]; ok {
+				dbRol = mapped
+				break
+			}
+		}
+		if dbRol == "" {
+			continue
+		}
+
+		found++
+		ok, err := p.usuariosRepo.SyncUsuario(ctx, u.ID, u.Username, u.FirstName, u.LastName, dbRol)
+		if err != nil {
+			log.Warn().Err(err).Str("user", u.Username).Msg("poller: sync: error insertando usuario")
+			continue
+		}
+		if ok {
+			inserted++
+			log.Info().Str("username", u.Username).Str("rol", dbRol).Msg("poller: usuario sincronizado desde Keycloak")
+		}
+	}
+
+	if found > 0 {
+		log.Info().Int("encontrados", found).Int("insertados", inserted).Msg("poller: sync KC→DB completado")
+		p.syncDone = true
+	}
 }
 
 // sanitizeDetails elimina campos sensibles del mapa de detalles (P-04).

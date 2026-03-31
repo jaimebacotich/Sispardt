@@ -59,6 +59,50 @@ func (r *UsuarioSistemaRepo) UpdateDatos(ctx context.Context, tx pgx.Tx, id stri
 	return err
 }
 
+// SyncUsuario inserta un usuario proveniente de Keycloak si aún no existe en la BD.
+// Retorna true si fue insertado, false si ya existía o el rol no se encontró.
+func (r *UsuarioSistemaRepo) SyncUsuario(ctx context.Context, id, username, nombres, apellidos, rolNombre string) (bool, error) {
+	var rolID int
+	err := r.pool.QueryRow(ctx,
+		"SELECT id FROM public.roles WHERE nombre = $1", rolNombre,
+	).Scan(&rolID)
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO public.usuarios_sistema (id, username, nombres, apellidos, estado)
+		VALUES ($1, $2, $3, $4, 'ACTIVO')
+		ON CONFLICT (id) DO NOTHING
+	`, id, username, nombres, apellidos)
+	if err != nil {
+		return false, err
+	}
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO public.usuarios_roles (usuario_id, rol_id)
+		VALUES ($1, $2)
+		ON CONFLICT DO NOTHING
+	`, id, rolID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, tx.Commit(ctx)
+}
+
 func (r *UsuarioSistemaRepo) SoftDelete(ctx context.Context, tx pgx.Tx, id string) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE public.usuarios_sistema SET eliminado_at = NOW(), estado = 'ELIMINADO', actualizado_at = NOW()

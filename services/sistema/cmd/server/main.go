@@ -75,9 +75,13 @@ func main() {
 		log.Info().Strs("clients", clientesMonitoreados).Msg("UUIDs de clientes Keycloak resueltos")
 	}
 
-	// Inicializar repositorio de sesiones y poller
+	// Inicializar repositorios
 	sesionesRepo := repository.NewSesionesRepo(pool)
+	usuariosRepo := repository.NewUsuarioSistemaRepo(pool)
+
+	// Inicializar poller (eventos KC + sync inicial de usuarios)
 	p := poller.New(sesionesRepo, kcClient, cfg.KeycloakRealm, cfg.PollIntervalSeconds)
+	p.SetUsuariosRepo(usuariosRepo)
 	go p.Run(ctx)
 	log.Info().Int("interval_s", cfg.PollIntervalSeconds).Msg("poller de eventos Keycloak iniciado")
 

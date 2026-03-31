@@ -87,7 +87,7 @@ $KCADM update authentication/required-actions/update_user_locale \
 
 # ---- 5. Crear roles (idempotente) ----
 log "Creando roles..."
-for ROLE in admin_general responsable_registro tecnico_registro responsable_estadistica recepcionista estadistica_externa migraciones; do
+for ROLE in admin_general responsable_registro tecnico_registro recepcionista estadistica_externa migraciones; do
     if ! $KCADM get "roles/${ROLE}" -r "${REALM}" >/dev/null 2>&1; then
         $KCADM create roles -r "${REALM}" -s name="${ROLE}"
         ok "  Rol creado: ${ROLE}"
@@ -466,28 +466,18 @@ create_user() {
 # UUID institución (usuarios administrativos)
 INST_UUID="11111111-1111-1111-1111-111111111111"
 
-# UUIDs de establecimientos de prueba (comentados hasta que se creen establecimientos reales)
-# HOTEL_GRAN_TARIJA="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-# HOSTAL_COLONIAL="b1ffcd00-ad1c-5fa9-cc7e-7cc0ce491b22"
-
-create_user "admin.sispardt"   "Jaime"  "Bacotich" "admin_general"           "${INST_UUID}"
-create_user "resp.registro"    "Maria"   "Torres"    "responsable_registro"    "${INST_UUID}"
-create_user "tec.registro"     "Luis"    "Rojas"     "tecnico_registro"        "${INST_UUID}"
-create_user "resp.estadistica" "Ana"     "Mendoza"   "responsable_estadistica" "${INST_UUID}"
-# create_user "recep.grantarija" "Julia"   "Morales"   "recepcionista"           "${HOTEL_GRAN_TARIJA}"
-# create_user "recep.colonial"   "Laura"   "Fernandez" "recepcionista"           "${HOSTAL_COLONIAL}"
+create_user "admin.sispardt" "Jaime" "Bacotich" "admin_general"        "${INST_UUID}"
+create_user "resp.registro"  "Maria" "Torres"   "responsable_registro" "${INST_UUID}"
+create_user "tec.registro"   "Luis"  "Rojas"    "tecnico_registro"     "${INST_UUID}"
 
 # ---- 12. Resumen ----
 log ""
 ok "========== Init de Keycloak completado =========="
 log "  Realm:    ${REALM}"
 log "  Usuarios:"
-log "    admin.sispardt   -> admin_general           (${INST_UUID})"
-log "    resp.registro    -> responsable_registro    (${INST_UUID})"
-log "    tec.registro     -> tecnico_registro        (${INST_UUID})"
-log "    resp.estadistica -> responsable_estadistica (${INST_UUID})"
-# log "    recep.grantarija -> recepcionista           (${HOTEL_GRAN_TARIJA})"
-# log "    recep.colonial   -> recepcionista           (${HOSTAL_COLONIAL})"
+log "    admin.sispardt -> admin_general        (${INST_UUID})"
+log "    resp.registro  -> responsable_registro (${INST_UUID})"
+log "    tec.registro   -> tecnico_registro     (${INST_UUID})"
 log "  Contraseña: ver variable SISPARDT_USER_PASSWORD en .env"
 log "  Login: ${KC_URL}/realms/${REALM}/account"
 log "  Clientes SA:"

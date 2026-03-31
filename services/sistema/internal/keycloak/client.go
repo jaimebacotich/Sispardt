@@ -413,6 +413,50 @@ func (c *AdminClient) GetClientUUIDs() map[string]string {
 	return result
 }
 
+// ─── Listado de usuarios ───────────────────────────────────────────────────
+
+// KCUserEntry representa un usuario del Admin REST API de Keycloak.
+type KCUserEntry struct {
+	ID         string              `json:"id"`
+	Username   string              `json:"username"`
+	FirstName  string              `json:"firstName"`
+	LastName   string              `json:"lastName"`
+	Enabled    bool                `json:"enabled"`
+	Attributes map[string][]string `json:"attributes"`
+}
+
+// ListUsers retorna todos los usuarios del realm (máx. 500).
+func (c *AdminClient) ListUsers(ctx context.Context) ([]KCUserEntry, error) {
+	token, err := c.getToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	apiURL := fmt.Sprintf("%s/admin/realms/%s/users?max=500", c.baseURL, c.realm)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET users KC: %w", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET users KC: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	var users []KCUserEntry
+	if err := json.Unmarshal(body, &users); err != nil {
+		return nil, fmt.Errorf("decodificar users KC: %w", err)
+	}
+	return users, nil
+}
+
 // ─── Gestión de usuarios ───────────────────────────────────────────────────
 
 // CreateUserRequest parámetros para crear un usuario en Keycloak.
