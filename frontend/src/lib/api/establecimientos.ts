@@ -132,5 +132,24 @@ export const establecimientosApi = {
       token
     );
   },
+
+  listAuditoriaSistema: (
+    token: string,
+    params?: { page?: number; pageSize?: number; search?: string; accion?: string; tabla?: string; rol?: string; fechaDesde?: string; fechaHasta?: string }
+  ) => {
+    const q = new URLSearchParams();
+    if (params?.page)       q.set("page",         String(params.page));
+    if (params?.pageSize)   q.set("page_size",     String(params.pageSize));
+    if (params?.search)     q.set("search",        params.search);
+    if (params?.accion)     q.set("accion",        params.accion);
+    if (params?.tabla)      q.set("tabla",         params.tabla);
+    if (params?.rol)        q.set("rol",           params.rol);
+    if (params?.fechaDesde) q.set("fecha_desde",   params.fechaDesde);
+    if (params?.fechaHasta) q.set("fecha_hasta",   params.fechaHasta);
+    return apiClient.get<PagedResult<AuditoriaTransaccion>>(
+      `/api/v1/sistema/auditoria?${q}`,
+      token
+    );
+  },
 };
 

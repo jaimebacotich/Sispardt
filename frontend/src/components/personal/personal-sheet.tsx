@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -82,6 +82,15 @@ export function PersonalSheet({
 
   const usuarioSistema = watch("usuarioSistema");
   const usernameValue = watch("username");
+  const usernameRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (usuarioSistema && !yaEsUsuarioSistema) {
+      setTimeout(() => {
+        usernameRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 50);
+    }
+  }, [usuarioSistema, yaEsUsuarioSistema]);
 
   useEffect(() => {
     if (!open) return;
@@ -144,9 +153,9 @@ export function PersonalSheet({
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="flex flex-col">
+      <SheetContent side="right" className="flex flex-col h-full">
         {/* Header */}
-        <SheetHeader className="border-b border-border pb-4">
+        <SheetHeader className="pb-4 flex-shrink-0">
           <SheetTitle className="flex items-center gap-2">
             {isEdit ? (
               <UserCog size={16} className="text-primary" />
@@ -158,7 +167,7 @@ export function PersonalSheet({
           <SheetDescription>
             {isEdit
               ? "Modifica los datos del integrante del personal."
-              : "Completa los datos para registrar un nuevo integrante."}
+              : "Completa los datos:"}
           </SheetDescription>
         </SheetHeader>
 
@@ -166,7 +175,7 @@ export function PersonalSheet({
         <form
           id="personal-form"
           onSubmit={handleSubmit(onSubmit)}
-          className="flex-1 overflow-y-auto px-4 py-5 space-y-5"
+          className="flex-1 min-h-0 overflow-y-auto px-4 pt-5 pb-10 space-y-5"
         >
           {/* Nombres */}
           <FormField
@@ -263,14 +272,14 @@ export function PersonalSheet({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Crea un acceso para que esta persona pueda ingresar al sistema como recepcionista.
+                  Crear acceso para ingresar al sistema como recepcionista.
                 </p>
               </div>
             </label>
 
             {/* Campo username para nuevo usuario de sistema */}
             {usuarioSistema && !yaEsUsuarioSistema && (
-              <div className="ml-7 space-y-1.5">
+              <div ref={usernameRef} className="ml-7 space-y-1.5">
                 <label className="text-xs font-medium text-foreground flex items-center gap-1">
                   Nombre de usuario
                   <span className="text-destructive">*</span>
@@ -323,7 +332,7 @@ export function PersonalSheet({
         </form>
 
         {/* Footer */}
-        <SheetFooter className="border-t border-border pt-4">
+        <SheetFooter className="border-t border-border pt-4 flex-shrink-0">
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>

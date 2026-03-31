@@ -408,7 +408,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.sistema.rule=PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`)"
+      - "traefik.http.routers.sistema.rule=PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`) || PathPrefix(`/api/v1/sistema`)"
       - "traefik.http.routers.sistema.entrypoints=web"
       - "traefik.http.routers.sistema.priority=90"
       - "traefik.http.routers.sistema.middlewares=sistema-ratelimit"

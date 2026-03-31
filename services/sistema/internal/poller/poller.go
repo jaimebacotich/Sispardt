@@ -307,8 +307,13 @@ func (p *Poller) syncUsuariosDesdeKeycloak(ctx context.Context) {
 	}
 
 	if found > 0 {
-		log.Info().Int("encontrados", found).Int("insertados", inserted).Msg("poller: sync KC→DB completado")
-		p.syncDone = true
+		log.Info().Int("encontrados", found).Int("insertados", inserted).Msg("poller: sync KC→DB")
+		// Solo marcar como completo cuando no haya nuevos usuarios que insertar.
+		// Si aún se insertaron, keycloak-init puede estar creando más usuarios.
+		if inserted == 0 {
+			p.syncDone = true
+			log.Info().Msg("poller: sync KC→DB completado, no se reintentará")
+		}
 	}
 }
 

@@ -48,6 +48,10 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/03-seed-roles.sql"
 log "--> 04: Roles y permisos de BD..."
 psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/04-roles-db.sql"
 
+# ---- 6. Auditoría transaccional ----
+log "--> 05: Auditoría transaccional (triggers sobre tablas de usuarios)..."
+psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/05-schema-auditoria.sql"
+
 # ---- 6. Usuario de aplicación con login ----
 log "--> Creando usuario de aplicacion app_sistema..."
 psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL

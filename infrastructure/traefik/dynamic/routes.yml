@@ -20,7 +20,7 @@ http:
         - web
 
     sistema:
-      rule: "PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`)"
+      rule: "PathPrefix(`/api/v1/auditoria-sesiones`) || PathPrefix(`/api/v1/usuarios-sistema`) || PathPrefix(`/api/v1/sistema`)"
       service: svc-sistema
       middlewares:
         - sistema-ratelimit

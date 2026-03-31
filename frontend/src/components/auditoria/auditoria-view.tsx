@@ -19,16 +19,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuditoria, useAuditoriaMovimientos, useEstablecimientos } from "@/hooks/useEstablecimientos";
+import { useAuditoria, useAuditoriaMovimientos, useAuditoriaSistema, useEstablecimientos } from "@/hooks/useEstablecimientos";
 
 const PAGE_SIZE = 15;
 
-type BDFiltro = "todos" | "establecimientos" | "movimientos";
+type BDFiltro = "todos" | "establecimientos" | "movimientos" | "sistema";
 
 const BD_CONFIG: Record<BDFiltro, { label: string; border: string; dot: string }> = {
-  todos:             { label: "Todos",            border: "border-primary/60",  dot: "bg-primary" },
-  establecimientos:  { label: "Establecimientos", border: "border-blue-400",    dot: "bg-blue-500" },
-  movimientos:       { label: "Movimientos",      border: "border-emerald-400", dot: "bg-emerald-500" },
+  todos:             { label: "Todos",            border: "border-primary/60",   dot: "bg-primary" },
+  establecimientos:  { label: "Establecimientos", border: "border-blue-400",     dot: "bg-blue-500" },
+  movimientos:       { label: "Movimientos",      border: "border-emerald-400",  dot: "bg-emerald-500" },
+  sistema:           { label: "Sistema",          border: "border-violet-400",   dot: "bg-violet-500" },
 };
 
 const ACTION_CHIPS: FilterChip<AuditAccion>[] = [
@@ -38,12 +39,15 @@ const ACTION_CHIPS: FilterChip<AuditAccion>[] = [
 ];
 
 const TABLA_CHIPS: FilterChip[] = [
-  { value: "establecimientos", label: "establecimientos" },
-  { value: "habitaciones",     label: "habitaciones" },
-  { value: "partes_diarios",   label: "partes_diarios" },
-  { value: "cierres_diarios",  label: "cierres_diarios" },
-  { value: "personas",         label: "personas" },
-  { value: "personal",         label: "personal" },
+  { value: "establecimientos",  label: "establecimientos" },
+  { value: "habitaciones",      label: "habitaciones" },
+  { value: "partes_diarios",    label: "partes_diarios" },
+  { value: "cierres_diarios",   label: "cierres_diarios" },
+  { value: "personas",          label: "personas" },
+  { value: "personal",          label: "personal" },
+  { value: "usuarios_sistema",  label: "usuarios_sistema" },
+  { value: "roles",             label: "roles" },
+  { value: "usuarios_roles",    label: "usuarios_roles" },
 ];
 
 const ROLE_OPTIONS = [
@@ -95,17 +99,20 @@ export function AuditoriaView() {
     page,
   };
 
-  const estabEnabled = bdFiltro === "todos" || bdFiltro === "establecimientos";
-  const movEnabled   = bdFiltro === "todos" || bdFiltro === "movimientos";
+  const estabEnabled   = bdFiltro === "todos" || bdFiltro === "establecimientos";
+  const movEnabled     = bdFiltro === "todos" || bdFiltro === "movimientos";
+  const sistemaEnabled = bdFiltro === "todos" || bdFiltro === "sistema";
 
   const { data: estabData, isLoading: loadingEstab, isError: isErrorEstab, error: errorEstab } =
     useAuditoria(estabEnabled ? sharedParams : undefined);
   const { data: movData, isLoading: loadingMov, isError: isErrorMov, error: errorMov } =
     useAuditoriaMovimientos(movEnabled ? sharedParams : undefined);
+  const { data: sistemaData, isLoading: loadingSistema, isError: isErrorSistema, error: errorSistema } =
+    useAuditoriaSistema(sistemaEnabled ? sharedParams : undefined);
 
-  const isLoading = (estabEnabled && loadingEstab) || (movEnabled && loadingMov);
-  const isError   = (estabEnabled && isErrorEstab) || (movEnabled && isErrorMov);
-  const errorMsg  = (errorEstab as Error)?.message ?? (errorMov as Error)?.message ?? "Error desconocido";
+  const isLoading = (estabEnabled && loadingEstab) || (movEnabled && loadingMov) || (sistemaEnabled && loadingSistema);
+  const isError   = (estabEnabled && isErrorEstab) || (movEnabled && isErrorMov) || (sistemaEnabled && isErrorSistema);
+  const errorMsg  = (errorEstab as Error)?.message ?? (errorMov as Error)?.message ?? (errorSistema as Error)?.message ?? "Error desconocido";
 
   type PagedShape = { data?: AuditoriaTransaccion[]; total?: number };
 
@@ -121,18 +128,27 @@ export function AuditoriaView() {
     return raw.map((r) => ({ ...r, source: "movimientos" as const }));
   }, [movData, movEnabled]);
 
+  const sistemaRows: AuditoriaTransaccion[] = useMemo(() => {
+    if (!sistemaEnabled) return [];
+    const raw = (sistemaData as PagedShape)?.data ?? (Array.isArray(sistemaData) ? sistemaData : []);
+    return raw.map((r) => ({ ...r, source: "sistema" as const }));
+  }, [sistemaData, sistemaEnabled]);
+
   const allLogs = useMemo<AuditoriaTransaccion[]>(() => {
     if (bdFiltro === "establecimientos") return estabRows;
     if (bdFiltro === "movimientos")      return movRows;
-    return [...estabRows, ...movRows].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  }, [estabRows, movRows, bdFiltro]);
+    if (bdFiltro === "sistema")          return sistemaRows;
+    return [...estabRows, ...movRows, ...sistemaRows].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }, [estabRows, movRows, sistemaRows, bdFiltro]);
 
-  const estabTotal = (estabData as PagedShape)?.total ?? estabRows.length;
-  const movTotal   = (movData   as PagedShape)?.total ?? movRows.length;
+  const estabTotal   = (estabData   as PagedShape)?.total ?? estabRows.length;
+  const movTotal     = (movData     as PagedShape)?.total ?? movRows.length;
+  const sistemaTotal = (sistemaData as PagedShape)?.total ?? sistemaRows.length;
   const total =
-    bdFiltro === "establecimientos" ? estabTotal :
-    bdFiltro === "movimientos"      ? movTotal   :
-    estabTotal + movTotal;
+    bdFiltro === "establecimientos" ? estabTotal   :
+    bdFiltro === "movimientos"      ? movTotal     :
+    bdFiltro === "sistema"          ? sistemaTotal :
+    estabTotal + movTotal + sistemaTotal;
 
   // Filtrado cliente para múltiples selecciones de accion/tabla
   const filtered = allLogs.filter((log) => {
@@ -183,6 +199,7 @@ export function AuditoriaView() {
   const SOURCE_LABEL: Record<string, { label: string; color: string }> = {
     establecimientos: { label: "Establecimientos", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
     movimientos:      { label: "Movimientos",      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+    sistema:          { label: "Sistema",          color: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
   };
 
   const ROL_BADGE: Record<string, string> = {

@@ -89,7 +89,7 @@ func main() {
 	userSvc := service.NewUsuarioSistemaService(pool, kcClient)
 
 	// Construir router
-	router := handler.NewRouter(jwtValidator, sesionesRepo, kcClient, p.State, userSvc)
+	router := handler.NewRouter(jwtValidator, sesionesRepo, kcClient, p.State, userSvc, pool)
 
 	// Servidor HTTP
 	srv := &http.Server{

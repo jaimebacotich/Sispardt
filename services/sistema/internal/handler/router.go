@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"sispardt/sistema/internal/auth"
 	"sispardt/sistema/internal/keycloak"
@@ -20,6 +22,7 @@ func NewRouter(
 	kcClient *keycloak.AdminClient,
 	pollerState *poller.State,
 	userSvc *service.UsuarioSistemaService,
+	pool *pgxpool.Pool,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -42,6 +45,7 @@ func NewRouter(
 	r.Group(func(r chi.Router) {
 		r.Use(jwtValidator.Middleware)
 		r.Use(auth.RequireRole(auth.RoleAdminGeneral))
+		r.Use(auditContextMiddleware) // inyecta AuditInfo en ctx para triggers de auditoría
 
 		// Auditoría de sesiones
 		sesionesHandler := NewSesionesHandler(repo, kcClient)
@@ -60,9 +64,34 @@ func NewRouter(
 			r.Patch("/{id}/rol", userHandler.CambiarRol)
 			r.Delete("/{id}", userHandler.Delete)
 		})
+
+		// Auditoría transaccional de usuarios del sistema
+		auditoriaHandler := NewAuditoriaHandler(pool, kcClient)
+		r.Get("/api/v1/sistema/auditoria", auditoriaHandler.List)
 	})
 
 	return r
+}
+
+// auditContextMiddleware extrae los claims del JWT y el IP del cliente,
+// e inyecta un AuditInfo en el contexto para que WithTx lo use en los triggers.
+func auditContextMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims := auth.FromContext(r.Context())
+		if claims != nil {
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				ip = r.RemoteAddr
+			}
+			ctx := repository.WithAuditInfo(r.Context(), repository.AuditInfo{
+				UserID:   claims.Sub,
+				Username: claims.Username,
+				ClientIP: ip,
+			})
+			r = r.WithContext(ctx)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // corsMiddleware añade headers CORS permisivos en desarrollo.

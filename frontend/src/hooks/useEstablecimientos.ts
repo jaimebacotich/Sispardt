@@ -14,6 +14,7 @@ export const QUERY_KEYS = {
   localidades: ["localidades"] as const,
   auditoria: (params: object) => ["auditoria", params] as const,
   auditoriaMovimientos: (params: object) => ["auditoria-movimientos", params] as const,
+  auditoriaSistema: (params: object) => ["auditoria-sistema", params] as const,
 };
 
 export function useEstablecimientos(params?: { search?: string; categoriaId?: string; localidadId?: string; pageSize?: number }) {
@@ -129,6 +130,15 @@ export function useAuditoriaMovimientos(params?: AuditoriaParams) {
   return useQuery({
     queryKey: QUERY_KEYS.auditoriaMovimientos(params ?? {}),
     queryFn: () => establecimientosApi.listAuditoriaMovimientos(accessToken!, params),
+    enabled: !!accessToken,
+  });
+}
+
+export function useAuditoriaSistema(params?: AuditoriaParams) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: QUERY_KEYS.auditoriaSistema(params ?? {}),
+    queryFn: () => establecimientosApi.listAuditoriaSistema(accessToken!, params),
     enabled: !!accessToken,
   });
 }
