@@ -964,8 +964,8 @@ func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, establecimientoID
 			c.tipo_habitacion,
 			c.total_camas,
 			COALESCE(o.ocupadas_promedio, 0),
-			ROUND(COALESCE(o.ocupadas_promedio, 0)::numeric / NULLIF(c.total_camas, 0) * 100, 1),
-			ROUND(c.total_camas::numeric / NULLIF(dt.total, 0) * 100, 1)
+			COALESCE(ROUND(COALESCE(o.ocupadas_promedio, 0)::numeric / NULLIF(c.total_camas, 0) * 100, 1), 0),
+			COALESCE(ROUND(c.total_camas::numeric / NULLIF(dt.total, 0) * 100, 1), 0)
 		FROM capacidad c
 		LEFT JOIN ocupadas o ON o.tipo_habitacion = c.tipo_habitacion
 		CROSS JOIN dist_total dt

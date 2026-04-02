@@ -240,10 +240,10 @@ export function useHabitacionesEstadoEnFecha(fecha: string) {
 }
 
 // ── Estadísticas de ocupación ──────────────────────────────────────────────
-export function useOcupacion(establecimientoId: string, fechaDesde: string, fechaHasta: string) {
+export function useOcupacion(establecimientoId: string, fechaDesde: string, fechaHasta: string, localidadId?: string) {
   const { accessToken } = useAuth();
   return useQuery({
-    queryKey: MOV_KEYS.ocupacion({ establecimientoId, fechaDesde, fechaHasta }),
+    queryKey: MOV_KEYS.ocupacion({ establecimientoId, fechaDesde, fechaHasta, localidadId }),
     queryFn: () =>
       movimientosApi.getOcupacion(accessToken!, { establecimientoId: establecimientoId || undefined, fechaDesde, fechaHasta }),
     enabled: !USE_MOCK && !!accessToken && !!fechaDesde && !!fechaHasta,

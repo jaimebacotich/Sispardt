@@ -125,12 +125,21 @@ export function EstadisticasDashboard() {
     [estList]
   );
 
-  // Params para hooks de estadísticas. establecimientoId opcional: vacío = todos los establecimientos.
-  const statsParams = { establecimientoId: establecimientoId || undefined, fechaDesde: fd, fechaHasta: fh };
-  const datesReady = !customInvalid && !!fd && !!fh;
+  // Municipio seleccionado sin establecimientos = no hay datos que mostrar
+  const sinEstablecimientos = !!localidadId && !loadingEst && estList.length === 0;
+
+  // localidadId se incluye en statsParams para que React Query invalide el caché al cambiar municipio,
+  // aunque el backend no lo use (la API solo lee establecimientoId, fechaDesde, fechaHasta).
+  const statsParams = {
+    establecimientoId: establecimientoId || undefined,
+    localidadId: localidadId || undefined,
+    fechaDesde: fd,
+    fechaHasta: fh,
+  };
+  const datesReady = !customInvalid && !!fd && !!fh && !sinEstablecimientos;
 
   const { data: resumen,        isLoading: loadingResumen   } = useResumenEstadisticas(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
-  const { data: ocupacionData,  isLoading: loadingOcupacion } = useOcupacion(establecimientoId, datesReady ? fd : "", datesReady ? fh : "");
+  const { data: ocupacionData,  isLoading: loadingOcupacion } = useOcupacion(establecimientoId, datesReady ? fd : "", datesReady ? fh : "", localidadId);
   const { data: nacionalidades, isLoading: loadingNac       } = useNacionalidades(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
   const { data: motivos,        isLoading: loadingMotivos   } = useMotivosViaje(datesReady ? { ...statsParams, agrupacion: agrupacionDesdePeriodo(periodo) } : { fechaDesde: "", fechaHasta: "" });
   const { data: tiposHab,       isLoading: loadingTipos     } = useTiposHabitacion(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
@@ -155,9 +164,9 @@ export function EstadisticasDashboard() {
                 setLocalidadId(e.target.value);
                 setEstablecimientoId(""); // resetear establecimiento al cambiar localidad
               }}
-              className="appearance-none bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer min-w-[180px]"
+              className="appearance-none bg-primary/10 border border-primary/40 rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer min-w-[180px]"
             >
-              <option value="">Todas las localidades</option>
+              <option value="">Todos los Municipios</option>
               {localidades.map((l) => (
                 <option key={l.id} value={l.id}>{l.nombre}</option>
               ))}
@@ -176,7 +185,7 @@ export function EstadisticasDashboard() {
                 <select
                   value={establecimientoId}
                   onChange={(e) => setEstablecimientoId(e.target.value)}
-                  className="appearance-none bg-card border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer min-w-[230px]"
+                  className="appearance-none bg-primary/10 border border-primary/40 rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer min-w-[230px]"
                 >
                   <option value="">Todos los establecimientos</option>
                   {estList.map((e) => (
@@ -233,13 +242,6 @@ export function EstadisticasDashboard() {
         )}
       </div>
 
-      {/* Aviso modo agregado — cuando no hay establecimiento seleccionado */}
-      {!isRecepcionista && !establecimientoId && (
-        <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-4 py-2.5">
-          Mostrando estadísticas agregadas de todos los establecimientos. Selecciona uno para ver datos individuales.
-        </p>
-      )}
-
       {/* Aviso cuando el rango custom está incompleto */}
       {customInvalid && (
         <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-4 py-2.5">
@@ -262,8 +264,8 @@ export function EstadisticasDashboard() {
       </div>
 
       {/* ── Gráficos fila 1: Tendencia Visitantes + Top Nac. ─────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2 bg-card rounded-xl border border-border p-5">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="bg-card rounded-xl border border-border p-5">
           <div className="mb-4">
             <h3 className="font-semibold text-sm text-foreground">Tendencia de Visitantes</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Flujo de turistas registrados en el período seleccionado</p>

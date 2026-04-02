@@ -56,7 +56,11 @@ DELETE FROM public.habitaciones_replica_cache
   WHERE establecimiento_id IN (
     'e1e10000-5eed-5eed-5eed-000000000001'::uuid,
     'e2e20000-5eed-5eed-5eed-000000000002'::uuid,
-    'e3e30000-5eed-5eed-5eed-000000000003'::uuid
+    'e3e30000-5eed-5eed-5eed-000000000003'::uuid,
+    'e4e40000-5eed-5eed-5eed-000000000004'::uuid,
+    'e5e50000-5eed-5eed-5eed-000000000005'::uuid,
+    'e6e60000-5eed-5eed-5eed-000000000006'::uuid,
+    'e7e70000-5eed-5eed-5eed-000000000007'::uuid
   );
 COMMIT;
 SQL
@@ -68,7 +72,11 @@ DELETE FROM public.establecimientos
   WHERE id IN (
     'e1e10000-5eed-5eed-5eed-000000000001'::uuid,
     'e2e20000-5eed-5eed-5eed-000000000002'::uuid,
-    'e3e30000-5eed-5eed-5eed-000000000003'::uuid
+    'e3e30000-5eed-5eed-5eed-000000000003'::uuid,
+    'e4e40000-5eed-5eed-5eed-000000000004'::uuid,
+    'e5e50000-5eed-5eed-5eed-000000000005'::uuid,
+    'e6e60000-5eed-5eed-5eed-000000000006'::uuid,
+    'e7e70000-5eed-5eed-5eed-000000000007'::uuid
   );
 COMMIT;
 SQL
@@ -322,8 +330,183 @@ BEGIN
     ('e3e30008-5eed-5eed-5eed-000000000008', tc_mat, 1);
 
 END $$;
+
+-- EST4–EST7 en bloque separado (Bermejo, Entre Ríos, Villa Montes, Uriondo)
+DO $$
+DECLARE
+  est4 uuid := 'e4e40000-5eed-5eed-5eed-000000000004';
+  est5 uuid := 'e5e50000-5eed-5eed-5eed-000000000005';
+  est6 uuid := 'e6e60000-5eed-5eed-5eed-000000000006';
+  est7 uuid := 'e7e70000-5eed-5eed-5eed-000000000007';
+
+  loc_tarija    integer;
+  loc_bermejo   integer;
+  loc_entreri   integer;
+  loc_villamont integer;
+  loc_uriondo   integer;
+
+  cat_hotel3  integer;
+  cat_hostal2 integer;
+  cat_aloj_a  integer;
+
+  t_ind  integer;
+  t_dob  integer;
+  t_tri  integer;
+  t_mat  integer;
+  t_sui  integer;
+
+  tc_ind integer;
+  tc_mat integer;
+  tc_kin integer;
+BEGIN
+  SELECT id INTO loc_tarija    FROM public.localidades WHERE nombre = 'Tarija'       LIMIT 1;
+  SELECT id INTO loc_bermejo   FROM public.localidades WHERE nombre = 'Bermejo'      LIMIT 1;
+  SELECT id INTO loc_entreri   FROM public.localidades WHERE nombre = 'Entre Ríos'   LIMIT 1;
+  SELECT id INTO loc_villamont FROM public.localidades WHERE nombre = 'Villa Montes' LIMIT 1;
+  SELECT id INTO loc_uriondo   FROM public.localidades WHERE nombre = 'Uriondo'      LIMIT 1;
+  IF loc_bermejo   IS NULL THEN loc_bermejo   := loc_tarija; END IF;
+  IF loc_entreri   IS NULL THEN loc_entreri   := loc_tarija; END IF;
+  IF loc_villamont IS NULL THEN loc_villamont := loc_tarija; END IF;
+  IF loc_uriondo   IS NULL THEN loc_uriondo   := loc_tarija; END IF;
+
+  SELECT c.id INTO cat_hotel3  FROM public.categorias c JOIN public.clasificaciones cl ON cl.id = c.clasificacion_id WHERE cl.nombre = 'Hotel'       AND c.nombre = '3 Estrellas' LIMIT 1;
+  SELECT c.id INTO cat_hostal2 FROM public.categorias c JOIN public.clasificaciones cl ON cl.id = c.clasificacion_id WHERE cl.nombre = 'Hostal'      AND c.nombre = '2 Estrellas' LIMIT 1;
+  SELECT c.id INTO cat_aloj_a  FROM public.categorias c JOIN public.clasificaciones cl ON cl.id = c.clasificacion_id WHERE cl.nombre = 'Alojamiento' AND c.nombre = 'Tipo A'      LIMIT 1;
+
+  SELECT id INTO t_ind FROM public.tipo_habitaciones WHERE nombre = 'Individual'  LIMIT 1;
+  SELECT id INTO t_dob FROM public.tipo_habitaciones WHERE nombre = 'Doble'       LIMIT 1;
+  SELECT id INTO t_tri FROM public.tipo_habitaciones WHERE nombre = 'Triple'      LIMIT 1;
+  SELECT id INTO t_mat FROM public.tipo_habitaciones WHERE nombre = 'Matrimonial' LIMIT 1;
+  SELECT id INTO t_sui FROM public.tipo_habitaciones WHERE nombre = 'Suite'       LIMIT 1;
+
+  SELECT id INTO tc_ind FROM public.tipo_camas WHERE nombre = 'Individual'  LIMIT 1;
+  SELECT id INTO tc_mat FROM public.tipo_camas WHERE nombre = 'Matrimonial' LIMIT 1;
+  SELECT id INTO tc_kin FROM public.tipo_camas WHERE nombre = 'King'        LIMIT 1;
+
+  -- ==========================================================
+  -- EST4: Hostal del Sur [SEED] — Bermejo, Hostal 2 Estrellas, 8 hab
+  -- cap = 3×1 + 3×2 + 2×3 = 15
+  -- ==========================================================
+
+  INSERT INTO public.establecimientos
+    (id, nro_licencia, razon_social, propietario, localidad_id, categoria_id,
+     tiene_licencia_vigente, fecha_vencimiento_licencia, direccion, telefono, estado_admin)
+  VALUES (est4, 'LIC-SEED-004', 'Hostal del Sur [SEED]', 'Propietario Seed Cuatro S.R.L.',
+     loc_bermejo, cat_hostal2, true, CURRENT_DATE + INTERVAL '1 year',
+     'Av. Internacional 120, Bermejo', '04-6960001', 'ACTIVO');
+
+  INSERT INTO public.habitaciones (id, establecimiento_id, tipo_habitacion_id, nro_habitacion, piso, estado_hab) VALUES
+    ('e4e40001-5eed-5eed-5eed-000000000001', est4, t_ind, 'H-101', '1', 'SERVICIO'),
+    ('e4e40002-5eed-5eed-5eed-000000000002', est4, t_ind, 'H-102', '1', 'SERVICIO'),
+    ('e4e40003-5eed-5eed-5eed-000000000003', est4, t_ind, 'H-103', '1', 'SERVICIO'),
+    ('e4e40004-5eed-5eed-5eed-000000000004', est4, t_dob, 'H-201', '2', 'SERVICIO'),
+    ('e4e40005-5eed-5eed-5eed-000000000005', est4, t_dob, 'H-202', '2', 'SERVICIO'),
+    ('e4e40006-5eed-5eed-5eed-000000000006', est4, t_dob, 'H-203', '2', 'SERVICIO'),
+    ('e4e40007-5eed-5eed-5eed-000000000007', est4, t_tri, 'H-301', '3', 'SERVICIO'),
+    ('e4e40008-5eed-5eed-5eed-000000000008', est4, t_tri, 'H-302', '3', 'SERVICIO');
+  INSERT INTO public.habitacion_camas (habitacion_id, tipo_cama_id, cantidad) VALUES
+    ('e4e40001-5eed-5eed-5eed-000000000001', tc_ind, 1),
+    ('e4e40002-5eed-5eed-5eed-000000000002', tc_ind, 1),
+    ('e4e40003-5eed-5eed-5eed-000000000003', tc_ind, 1),
+    ('e4e40004-5eed-5eed-5eed-000000000004', tc_ind, 2),
+    ('e4e40005-5eed-5eed-5eed-000000000005', tc_ind, 2),
+    ('e4e40006-5eed-5eed-5eed-000000000006', tc_ind, 2),
+    ('e4e40007-5eed-5eed-5eed-000000000007', tc_mat, 1),
+    ('e4e40007-5eed-5eed-5eed-000000000007', tc_ind, 1),
+    ('e4e40008-5eed-5eed-5eed-000000000008', tc_mat, 1),
+    ('e4e40008-5eed-5eed-5eed-000000000008', tc_ind, 1);
+
+  -- ==========================================================
+  -- EST5: Alojamiento El Valle [SEED] — Entre Ríos, Alojamiento Tipo A, 6 hab
+  -- cap = 2×1 + 3×2 + 1×2 = 10
+  -- ==========================================================
+  INSERT INTO public.establecimientos
+    (id, nro_licencia, razon_social, propietario, localidad_id, categoria_id,
+     tiene_licencia_vigente, fecha_vencimiento_licencia, direccion, telefono, estado_admin)
+  VALUES (est5, 'LIC-SEED-005', 'Alojamiento El Valle [SEED]', 'Propietario Seed Cinco',
+     loc_entreri, cat_aloj_a, true, CURRENT_DATE + INTERVAL '1 year',
+     'Calle Principal 45, Entre Ríos', '04-6870001', 'ACTIVO');
+
+  INSERT INTO public.habitaciones (id, establecimiento_id, tipo_habitacion_id, nro_habitacion, piso, estado_hab) VALUES
+    ('e5e50001-5eed-5eed-5eed-000000000001', est5, t_ind, 'H-101', '1', 'SERVICIO'),
+    ('e5e50002-5eed-5eed-5eed-000000000002', est5, t_ind, 'H-102', '1', 'SERVICIO'),
+    ('e5e50003-5eed-5eed-5eed-000000000003', est5, t_dob, 'H-201', '2', 'SERVICIO'),
+    ('e5e50004-5eed-5eed-5eed-000000000004', est5, t_dob, 'H-202', '2', 'SERVICIO'),
+    ('e5e50005-5eed-5eed-5eed-000000000005', est5, t_dob, 'H-203', '2', 'SERVICIO'),
+    ('e5e50006-5eed-5eed-5eed-000000000006', est5, t_mat, 'H-301', '3', 'SERVICIO');
+  INSERT INTO public.habitacion_camas (habitacion_id, tipo_cama_id, cantidad) VALUES
+    ('e5e50001-5eed-5eed-5eed-000000000001', tc_ind, 1),
+    ('e5e50002-5eed-5eed-5eed-000000000002', tc_ind, 1),
+    ('e5e50003-5eed-5eed-5eed-000000000003', tc_ind, 2),
+    ('e5e50004-5eed-5eed-5eed-000000000004', tc_ind, 2),
+    ('e5e50005-5eed-5eed-5eed-000000000005', tc_ind, 2),
+    ('e5e50006-5eed-5eed-5eed-000000000006', tc_mat, 1);
+
+  -- ==========================================================
+  -- EST6: Hotel Gran Villamontes [SEED] — Villa Montes, Hotel 3 Estrellas, 11 hab
+  -- cap = 2×1 + 4×2 + 2×3 + 2×2 + 1×2 = 22
+  -- ==========================================================
+  INSERT INTO public.establecimientos
+    (id, nro_licencia, razon_social, propietario, localidad_id, categoria_id,
+     tiene_licencia_vigente, fecha_vencimiento_licencia, direccion, telefono, estado_admin)
+  VALUES (est6, 'LIC-SEED-006', 'Hotel Gran Villamontes [SEED]', 'Propietario Seed Seis S.A.',
+     loc_villamont, cat_hotel3, true, CURRENT_DATE + INTERVAL '1 year',
+     'Av. Defensores del Chaco 300, Villa Montes', '04-6920001', 'ACTIVO');
+
+  INSERT INTO public.habitaciones (id, establecimiento_id, tipo_habitacion_id, nro_habitacion, piso, estado_hab) VALUES
+    ('e6e60001-5eed-5eed-5eed-000000000001', est6, t_ind, 'H-101', '1', 'SERVICIO'),
+    ('e6e60002-5eed-5eed-5eed-000000000002', est6, t_ind, 'H-102', '1', 'SERVICIO'),
+    ('e6e60003-5eed-5eed-5eed-000000000003', est6, t_dob, 'H-201', '2', 'SERVICIO'),
+    ('e6e60004-5eed-5eed-5eed-000000000004', est6, t_dob, 'H-202', '2', 'SERVICIO'),
+    ('e6e60005-5eed-5eed-5eed-000000000005', est6, t_dob, 'H-203', '2', 'SERVICIO'),
+    ('e6e60006-5eed-5eed-5eed-000000000006', est6, t_dob, 'H-204', '2', 'SERVICIO'),
+    ('e6e60007-5eed-5eed-5eed-000000000007', est6, t_tri, 'H-301', '3', 'SERVICIO'),
+    ('e6e60008-5eed-5eed-5eed-000000000008', est6, t_tri, 'H-302', '3', 'SERVICIO'),
+    ('e6e60009-5eed-5eed-5eed-000000000009', est6, t_mat, 'H-401', '4', 'SERVICIO'),
+    ('e6e60010-5eed-5eed-5eed-000000000010', est6, t_mat, 'H-402', '4', 'SERVICIO'),
+    ('e6e60011-5eed-5eed-5eed-000000000011', est6, t_sui, 'H-501', '5', 'SERVICIO');
+  INSERT INTO public.habitacion_camas (habitacion_id, tipo_cama_id, cantidad) VALUES
+    ('e6e60001-5eed-5eed-5eed-000000000001', tc_ind, 1),
+    ('e6e60002-5eed-5eed-5eed-000000000002', tc_ind, 1),
+    ('e6e60003-5eed-5eed-5eed-000000000003', tc_ind, 2),
+    ('e6e60004-5eed-5eed-5eed-000000000004', tc_ind, 2),
+    ('e6e60005-5eed-5eed-5eed-000000000005', tc_ind, 2),
+    ('e6e60006-5eed-5eed-5eed-000000000006', tc_ind, 2),
+    ('e6e60007-5eed-5eed-5eed-000000000007', tc_mat, 1),
+    ('e6e60007-5eed-5eed-5eed-000000000007', tc_ind, 1),
+    ('e6e60008-5eed-5eed-5eed-000000000008', tc_mat, 1),
+    ('e6e60008-5eed-5eed-5eed-000000000008', tc_ind, 1),
+    ('e6e60009-5eed-5eed-5eed-000000000009', tc_mat, 1),
+    ('e6e60010-5eed-5eed-5eed-000000000010', tc_mat, 1),
+    ('e6e60011-5eed-5eed-5eed-000000000011', tc_kin, 1);
+
+  -- ==========================================================
+  -- EST7: Posada Uriondo [SEED] — Uriondo, Alojamiento Tipo A, 5 hab
+  -- cap = 2×1 + 2×2 + 1×2 = 8
+  -- ==========================================================
+  INSERT INTO public.establecimientos
+    (id, nro_licencia, razon_social, propietario, localidad_id, categoria_id,
+     tiene_licencia_vigente, fecha_vencimiento_licencia, direccion, telefono, estado_admin)
+  VALUES (est7, 'LIC-SEED-007', 'Posada Uriondo [SEED]', 'Propietario Seed Siete',
+     loc_uriondo, cat_aloj_a, true, CURRENT_DATE + INTERVAL '1 year',
+     'Calle Viñedos 8, Uriondo', '04-6640087', 'ACTIVO');
+
+  INSERT INTO public.habitaciones (id, establecimiento_id, tipo_habitacion_id, nro_habitacion, piso, estado_hab) VALUES
+    ('e7e70001-5eed-5eed-5eed-000000000001', est7, t_ind, 'H-101', '1', 'SERVICIO'),
+    ('e7e70002-5eed-5eed-5eed-000000000002', est7, t_ind, 'H-102', '1', 'SERVICIO'),
+    ('e7e70003-5eed-5eed-5eed-000000000003', est7, t_dob, 'H-201', '2', 'SERVICIO'),
+    ('e7e70004-5eed-5eed-5eed-000000000004', est7, t_dob, 'H-202', '2', 'SERVICIO'),
+    ('e7e70005-5eed-5eed-5eed-000000000005', est7, t_mat, 'H-301', '3', 'SERVICIO');
+  INSERT INTO public.habitacion_camas (habitacion_id, tipo_cama_id, cantidad) VALUES
+    ('e7e70001-5eed-5eed-5eed-000000000001', tc_ind, 1),
+    ('e7e70002-5eed-5eed-5eed-000000000002', tc_ind, 1),
+    ('e7e70003-5eed-5eed-5eed-000000000003', tc_ind, 2),
+    ('e7e70004-5eed-5eed-5eed-000000000004', tc_ind, 2),
+    ('e7e70005-5eed-5eed-5eed-000000000005', tc_mat, 1);
+
+END $$;
 SQL
-ok "Establecimientos insertados (33 habitaciones en total)"
+ok "Establecimientos insertados (63 habitaciones en total, 7 municipios)"
 
 # ============================================================
 # PASO 2 — BD MOVIMIENTOS: replica cache + partes diarios
@@ -410,6 +593,52 @@ INSERT INTO public.habitaciones_replica_cache
   ('e3e30006-5eed-5eed-5eed-000000000006','e3e30000-5eed-5eed-5eed-000000000003','H-203','Doble',2,'LIBRE','2'),
   ('e3e30007-5eed-5eed-5eed-000000000007','e3e30000-5eed-5eed-5eed-000000000003','H-301','Matrimonial',2,'LIBRE','3'),
   ('e3e30008-5eed-5eed-5eed-000000000008','e3e30000-5eed-5eed-5eed-000000000003','H-302','Matrimonial',2,'LIBRE','3');
+
+-- EST4 (Bermejo, cap total = 15)
+INSERT INTO public.habitaciones_replica_cache
+  (habitacion_id, establecimiento_id, nro_habitacion, tipo_habitacion, capacidad_calculada, estado_actual, piso) VALUES
+  ('e4e40001-5eed-5eed-5eed-000000000001','e4e40000-5eed-5eed-5eed-000000000004','H-101','Individual',1,'LIBRE','1'),
+  ('e4e40002-5eed-5eed-5eed-000000000002','e4e40000-5eed-5eed-5eed-000000000004','H-102','Individual',1,'LIBRE','1'),
+  ('e4e40003-5eed-5eed-5eed-000000000003','e4e40000-5eed-5eed-5eed-000000000004','H-103','Individual',1,'LIBRE','1'),
+  ('e4e40004-5eed-5eed-5eed-000000000004','e4e40000-5eed-5eed-5eed-000000000004','H-201','Doble',2,'LIBRE','2'),
+  ('e4e40005-5eed-5eed-5eed-000000000005','e4e40000-5eed-5eed-5eed-000000000004','H-202','Doble',2,'LIBRE','2'),
+  ('e4e40006-5eed-5eed-5eed-000000000006','e4e40000-5eed-5eed-5eed-000000000004','H-203','Doble',2,'LIBRE','2'),
+  ('e4e40007-5eed-5eed-5eed-000000000007','e4e40000-5eed-5eed-5eed-000000000004','H-301','Triple',3,'LIBRE','3'),
+  ('e4e40008-5eed-5eed-5eed-000000000008','e4e40000-5eed-5eed-5eed-000000000004','H-302','Triple',3,'LIBRE','3');
+
+-- EST5 (Entre Ríos, cap total = 10)
+INSERT INTO public.habitaciones_replica_cache
+  (habitacion_id, establecimiento_id, nro_habitacion, tipo_habitacion, capacidad_calculada, estado_actual, piso) VALUES
+  ('e5e50001-5eed-5eed-5eed-000000000001','e5e50000-5eed-5eed-5eed-000000000005','H-101','Individual',1,'LIBRE','1'),
+  ('e5e50002-5eed-5eed-5eed-000000000002','e5e50000-5eed-5eed-5eed-000000000005','H-102','Individual',1,'LIBRE','1'),
+  ('e5e50003-5eed-5eed-5eed-000000000003','e5e50000-5eed-5eed-5eed-000000000005','H-201','Doble',2,'LIBRE','2'),
+  ('e5e50004-5eed-5eed-5eed-000000000004','e5e50000-5eed-5eed-5eed-000000000005','H-202','Doble',2,'LIBRE','2'),
+  ('e5e50005-5eed-5eed-5eed-000000000005','e5e50000-5eed-5eed-5eed-000000000005','H-203','Doble',2,'LIBRE','2'),
+  ('e5e50006-5eed-5eed-5eed-000000000006','e5e50000-5eed-5eed-5eed-000000000005','H-301','Matrimonial',2,'LIBRE','3');
+
+-- EST6 (Villa Montes, cap total = 22)
+INSERT INTO public.habitaciones_replica_cache
+  (habitacion_id, establecimiento_id, nro_habitacion, tipo_habitacion, capacidad_calculada, estado_actual, piso) VALUES
+  ('e6e60001-5eed-5eed-5eed-000000000001','e6e60000-5eed-5eed-5eed-000000000006','H-101','Individual',1,'LIBRE','1'),
+  ('e6e60002-5eed-5eed-5eed-000000000002','e6e60000-5eed-5eed-5eed-000000000006','H-102','Individual',1,'LIBRE','1'),
+  ('e6e60003-5eed-5eed-5eed-000000000003','e6e60000-5eed-5eed-5eed-000000000006','H-201','Doble',2,'LIBRE','2'),
+  ('e6e60004-5eed-5eed-5eed-000000000004','e6e60000-5eed-5eed-5eed-000000000006','H-202','Doble',2,'LIBRE','2'),
+  ('e6e60005-5eed-5eed-5eed-000000000005','e6e60000-5eed-5eed-5eed-000000000006','H-203','Doble',2,'LIBRE','2'),
+  ('e6e60006-5eed-5eed-5eed-000000000006','e6e60000-5eed-5eed-5eed-000000000006','H-204','Doble',2,'LIBRE','2'),
+  ('e6e60007-5eed-5eed-5eed-000000000007','e6e60000-5eed-5eed-5eed-000000000006','H-301','Triple',3,'LIBRE','3'),
+  ('e6e60008-5eed-5eed-5eed-000000000008','e6e60000-5eed-5eed-5eed-000000000006','H-302','Triple',3,'LIBRE','3'),
+  ('e6e60009-5eed-5eed-5eed-000000000009','e6e60000-5eed-5eed-5eed-000000000006','H-401','Matrimonial',2,'LIBRE','4'),
+  ('e6e60010-5eed-5eed-5eed-000000000010','e6e60000-5eed-5eed-5eed-000000000006','H-402','Matrimonial',2,'LIBRE','4'),
+  ('e6e60011-5eed-5eed-5eed-000000000011','e6e60000-5eed-5eed-5eed-000000000006','H-501','Suite',2,'LIBRE','5');
+
+-- EST7 (Uriondo, cap total = 8)
+INSERT INTO public.habitaciones_replica_cache
+  (habitacion_id, establecimiento_id, nro_habitacion, tipo_habitacion, capacidad_calculada, estado_actual, piso) VALUES
+  ('e7e70001-5eed-5eed-5eed-000000000001','e7e70000-5eed-5eed-5eed-000000000007','H-101','Individual',1,'LIBRE','1'),
+  ('e7e70002-5eed-5eed-5eed-000000000002','e7e70000-5eed-5eed-5eed-000000000007','H-102','Individual',1,'LIBRE','1'),
+  ('e7e70003-5eed-5eed-5eed-000000000003','e7e70000-5eed-5eed-5eed-000000000007','H-201','Doble',2,'LIBRE','2'),
+  ('e7e70004-5eed-5eed-5eed-000000000004','e7e70000-5eed-5eed-5eed-000000000007','H-202','Doble',2,'LIBRE','2'),
+  ('e7e70005-5eed-5eed-5eed-000000000005','e7e70000-5eed-5eed-5eed-000000000007','H-301','Matrimonial',2,'LIBRE','3');
 
 -- ----------------------------------------------------------
 -- 2B. partes_diarios
@@ -631,9 +860,208 @@ FROM (
 ) t
 WHERE t.n <= t.load;
 
+-- EST4: 3–8 huéspedes/día, tendencia creciente (Bermejo, frontera Argentina)
+INSERT INTO public.partes_diarios
+  (id, establecimiento_id, habitacion_id, persona_id,
+   fecha_reporte, ingreso_at, salida_at,
+   pais_procedencia_id, localidad_procedencia_id, motivo_viaje_id,
+   keycloak_recepcionista_id,
+   hab_nro_snapshot, hab_tipo_snapshot, estado_operativo)
+SELECT
+  gen_random_uuid(),
+  'e4e40000-5eed-5eed-5eed-000000000004'::uuid,
+  (ARRAY[
+    'e4e40001-5eed-5eed-5eed-000000000001'::uuid,
+    'e4e40002-5eed-5eed-5eed-000000000002'::uuid,
+    'e4e40003-5eed-5eed-5eed-000000000003'::uuid,
+    'e4e40004-5eed-5eed-5eed-000000000004'::uuid,
+    'e4e40005-5eed-5eed-5eed-000000000005'::uuid,
+    'e4e40006-5eed-5eed-5eed-000000000006'::uuid,
+    'e4e40007-5eed-5eed-5eed-000000000007'::uuid,
+    'e4e40008-5eed-5eed-5eed-000000000008'::uuid
+  ])[(t.n - 1) % 8 + 1],
+  NULL, t.fecha,
+  t.fecha::timestamp + ((t.day_idx * 9 + t.n * 7) % 13 + 8 || ' hours')::interval,
+  t.fecha::timestamp + ((t.day_idx * 9 + t.n * 7) % 13 + 8 || ' hours')::interval
+    + ((t.n + t.day_idx) % 3 + 1 || ' days')::interval,
+  -- Bermejo fronterizo: más Argentina y Bolivia, algo de Paraguay
+  (ARRAY[1,1,1,1,1,1,2,2,2,2,2,2,3,3,4,4,8,8,12,11])
+    [(t.day_idx * 9 + t.n * 11) % 20 + 1],
+  CASE WHEN (ARRAY[1,1,1,1,1,1,2,2,2,2,2,2,3,3,4,4,8,8,12,11])
+              [(t.day_idx * 9 + t.n * 11) % 20 + 1] = 1
+    THEN (t.day_idx * 5 + t.n * 9) % 11 + 1 ELSE NULL END,
+  (ARRAY[1,1,1,1,2,2,2,2,2,3,3,3,3,3,6,6,4,4,10,10])
+    [(t.day_idx * 11 + t.n * 9) % 20 + 1],
+  '00000000-5eed-5eed-5eed-000000000001'::uuid,
+  (ARRAY['H-101','H-102','H-103','H-201','H-202','H-203','H-301','H-302'])[(t.n - 1) % 8 + 1],
+  (ARRAY['Individual','Individual','Individual','Doble','Doble','Doble','Triple','Triple'])[(t.n - 1) % 8 + 1],
+  'ACTIVO'
+FROM (
+  SELECT d::date AS fecha,
+    (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
+    -- Tendencia creciente lineal: de 3 en enero a 8 en marzo
+    (3 + round(5 * (d::date - '2026-01-01'::date)::float / 89))::int AS load
+  FROM generate_series('2026-01-01'::date, '2026-03-31'::date, '1 day'::interval) d
+  CROSS JOIN generate_series(1, 8) g(n)
+) t
+WHERE t.n <= t.load;
+
+-- EST5: 2–6 huéspedes/día, bimodal (Entre Ríos, turismo de aventura)
+INSERT INTO public.partes_diarios
+  (id, establecimiento_id, habitacion_id, persona_id,
+   fecha_reporte, ingreso_at, salida_at,
+   pais_procedencia_id, localidad_procedencia_id, motivo_viaje_id,
+   keycloak_recepcionista_id,
+   hab_nro_snapshot, hab_tipo_snapshot, estado_operativo)
+SELECT
+  gen_random_uuid(),
+  'e5e50000-5eed-5eed-5eed-000000000005'::uuid,
+  (ARRAY[
+    'e5e50001-5eed-5eed-5eed-000000000001'::uuid,
+    'e5e50002-5eed-5eed-5eed-000000000002'::uuid,
+    'e5e50003-5eed-5eed-5eed-000000000003'::uuid,
+    'e5e50004-5eed-5eed-5eed-000000000004'::uuid,
+    'e5e50005-5eed-5eed-5eed-000000000005'::uuid,
+    'e5e50006-5eed-5eed-5eed-000000000006'::uuid
+  ])[(t.n - 1) % 6 + 1],
+  NULL, t.fecha,
+  t.fecha::timestamp + ((t.day_idx * 7 + t.n * 11) % 12 + 9 || ' hours')::interval,
+  t.fecha::timestamp + ((t.day_idx * 7 + t.n * 11) % 12 + 9 || ' hours')::interval
+    + ((t.n + t.day_idx) % 2 + 1 || ' days')::interval,
+  (ARRAY[1,1,1,1,1,1,1,1,1,2,2,2,3,3,4,4,8,8,12,11])
+    [(t.day_idx * 13 + t.n * 7) % 20 + 1],
+  CASE WHEN (ARRAY[1,1,1,1,1,1,1,1,1,2,2,2,3,3,4,4,8,8,12,11])
+              [(t.day_idx * 13 + t.n * 7) % 20 + 1] = 1
+    THEN (t.day_idx * 7 + t.n * 11) % 11 + 1 ELSE NULL END,
+  -- Turismo prevalente (aventura)
+  (ARRAY[1,1,1,1,1,1,1,1,2,2,2,3,3,3,6,6,6,4,10,10])
+    [(t.day_idx * 7 + t.n * 13) % 20 + 1],
+  '00000000-5eed-5eed-5eed-000000000001'::uuid,
+  (ARRAY['H-101','H-102','H-201','H-202','H-203','H-301'])[(t.n - 1) % 6 + 1],
+  (ARRAY['Individual','Individual','Doble','Doble','Doble','Matrimonial'])[(t.n - 1) % 6 + 1],
+  'ACTIVO'
+FROM (
+  SELECT d::date AS fecha,
+    (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
+    -- Bimodal: picos alrededor de día 20 (ene) y día 65 (mar)
+    (2 + round(4 * abs(sin((d::date - '2026-01-01'::date)::float * pi() / 40))))::int AS load
+  FROM generate_series('2026-01-01'::date, '2026-03-31'::date, '1 day'::interval) d
+  CROSS JOIN generate_series(1, 6) g(n)
+) t
+WHERE t.n <= t.load;
+
+-- EST6: 5–14 huéspedes/día, alto en verano (Villa Montes, calor extremo en verano)
+INSERT INTO public.partes_diarios
+  (id, establecimiento_id, habitacion_id, persona_id,
+   fecha_reporte, ingreso_at, salida_at,
+   pais_procedencia_id, localidad_procedencia_id, motivo_viaje_id,
+   keycloak_recepcionista_id,
+   hab_nro_snapshot, hab_tipo_snapshot, estado_operativo)
+SELECT
+  gen_random_uuid(),
+  'e6e60000-5eed-5eed-5eed-000000000006'::uuid,
+  (ARRAY[
+    'e6e60001-5eed-5eed-5eed-000000000001'::uuid,
+    'e6e60002-5eed-5eed-5eed-000000000002'::uuid,
+    'e6e60003-5eed-5eed-5eed-000000000003'::uuid,
+    'e6e60004-5eed-5eed-5eed-000000000004'::uuid,
+    'e6e60005-5eed-5eed-5eed-000000000005'::uuid,
+    'e6e60006-5eed-5eed-5eed-000000000006'::uuid,
+    'e6e60007-5eed-5eed-5eed-000000000007'::uuid,
+    'e6e60008-5eed-5eed-5eed-000000000008'::uuid,
+    'e6e60009-5eed-5eed-5eed-000000000009'::uuid,
+    'e6e60010-5eed-5eed-5eed-000000000010'::uuid,
+    'e6e60011-5eed-5eed-5eed-000000000011'::uuid
+  ])[(t.n - 1) % 11 + 1],
+  NULL, t.fecha,
+  t.fecha::timestamp + ((t.day_idx * 5 + t.n * 9) % 14 + 8 || ' hours')::interval,
+  t.fecha::timestamp + ((t.day_idx * 5 + t.n * 9) % 14 + 8 || ' hours')::interval
+    + ((t.n + t.day_idx) % 3 + 1 || ' days')::interval,
+  (ARRAY[1,1,1,1,1,1,1,2,2,2,2,3,3,4,4,8,8,8,12,11])
+    [(t.day_idx * 5 + t.n * 13) % 20 + 1],
+  CASE WHEN (ARRAY[1,1,1,1,1,1,1,2,2,2,2,3,3,4,4,8,8,8,12,11])
+              [(t.day_idx * 5 + t.n * 13) % 20 + 1] = 1
+    THEN (t.day_idx * 9 + t.n * 5) % 11 + 1 ELSE NULL END,
+  (ARRAY[1,1,1,1,1,2,2,2,2,3,3,3,3,6,6,4,4,10,10,10])
+    [(t.day_idx * 9 + t.n * 5) % 20 + 1],
+  '00000000-5eed-5eed-5eed-000000000001'::uuid,
+  (ARRAY['H-101','H-102','H-201','H-202','H-203','H-204','H-301','H-302','H-401','H-402','H-501'])[(t.n - 1) % 11 + 1],
+  (ARRAY['Individual','Individual','Doble','Doble','Doble','Doble','Triple','Triple','Matrimonial','Matrimonial','Suite'])[(t.n - 1) % 11 + 1],
+  'ACTIVO'
+FROM (
+  SELECT d::date AS fecha,
+    (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
+    -- Alto en enero (verano/calor), baja gradualmente hacia marzo
+    (5 + round(9 * (0.5 + 0.45 * cos((d::date - '2026-01-01'::date)::float * pi() / 89))))::int AS load
+  FROM generate_series('2026-01-01'::date, '2026-03-31'::date, '1 day'::interval) d
+  CROSS JOIN generate_series(1, 14) g(n)
+) t
+WHERE t.n <= t.load;
+
+-- EST7: 2–5 huéspedes/día, oscilación pequeña (Uriondo, viñedos, turismo bajo)
+INSERT INTO public.partes_diarios
+  (id, establecimiento_id, habitacion_id, persona_id,
+   fecha_reporte, ingreso_at, salida_at,
+   pais_procedencia_id, localidad_procedencia_id, motivo_viaje_id,
+   keycloak_recepcionista_id,
+   hab_nro_snapshot, hab_tipo_snapshot, estado_operativo)
+SELECT
+  gen_random_uuid(),
+  'e7e70000-5eed-5eed-5eed-000000000007'::uuid,
+  (ARRAY[
+    'e7e70001-5eed-5eed-5eed-000000000001'::uuid,
+    'e7e70002-5eed-5eed-5eed-000000000002'::uuid,
+    'e7e70003-5eed-5eed-5eed-000000000003'::uuid,
+    'e7e70004-5eed-5eed-5eed-000000000004'::uuid,
+    'e7e70005-5eed-5eed-5eed-000000000005'::uuid
+  ])[(t.n - 1) % 5 + 1],
+  NULL, t.fecha,
+  t.fecha::timestamp + ((t.day_idx * 11 + t.n * 7) % 11 + 9 || ' hours')::interval,
+  t.fecha::timestamp + ((t.day_idx * 11 + t.n * 7) % 11 + 9 || ' hours')::interval
+    + ((t.n + t.day_idx) % 2 + 1 || ' days')::interval,
+  (ARRAY[1,1,1,1,1,1,1,1,1,1,2,2,2,3,3,4,4,8,12,11])
+    [(t.day_idx * 11 + t.n * 7) % 20 + 1],
+  CASE WHEN (ARRAY[1,1,1,1,1,1,1,1,1,1,2,2,2,3,3,4,4,8,12,11])
+              [(t.day_idx * 11 + t.n * 7) % 20 + 1] = 1
+    THEN (t.day_idx * 7 + t.n * 11) % 11 + 1 ELSE NULL END,
+  (ARRAY[1,1,1,1,1,1,1,2,2,2,3,3,6,6,6,4,4,10,10,10])
+    [(t.day_idx * 7 + t.n * 11) % 20 + 1],
+  '00000000-5eed-5eed-5eed-000000000001'::uuid,
+  (ARRAY['H-101','H-102','H-201','H-202','H-301'])[(t.n - 1) % 5 + 1],
+  (ARRAY['Individual','Individual','Doble','Doble','Matrimonial'])[(t.n - 1) % 5 + 1],
+  'ACTIVO'
+FROM (
+  SELECT d::date AS fecha,
+    (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
+    -- Pequeña oscilación mensual, capacidad limitada
+    (2 + round(3 * abs(sin((d::date - '2026-01-01'::date)::float * pi() / 25))))::int AS load
+  FROM generate_series('2026-01-01'::date, '2026-03-31'::date, '1 day'::interval) d
+  CROSS JOIN generate_series(1, 5) g(n)
+) t
+WHERE t.n <= t.load;
+
 -- Restaurar triggers
 ALTER TABLE public.partes_diarios ENABLE TRIGGER tr_validar_capacidad_habitacion;
 ALTER TABLE public.partes_diarios ENABLE TRIGGER tr_audit_partes;
+
+-- Corrección de capacidad_calculada: el Kafka consumer puede haber sobreescrito los valores
+-- antes de procesar los eventos de habitacion_camas. Este UPDATE fuerza los valores correctos.
+UPDATE public.habitaciones_replica_cache
+SET capacidad_calculada = CASE tipo_habitacion
+  WHEN 'Individual'   THEN 1
+  WHEN 'Doble'        THEN 2
+  WHEN 'Triple'       THEN 3
+  WHEN 'Matrimonial'  THEN 2
+  WHEN 'Familiar'     THEN 4
+  WHEN 'Suite'        THEN 2
+  ELSE capacidad_calculada
+END
+WHERE establecimiento_id IN (
+  'e1e10000-5eed-5eed-5eed-000000000001','e2e20000-5eed-5eed-5eed-000000000002',
+  'e3e30000-5eed-5eed-5eed-000000000003','e4e40000-5eed-5eed-5eed-000000000004',
+  'e5e50000-5eed-5eed-5eed-000000000005','e6e60000-5eed-5eed-5eed-000000000006',
+  'e7e70000-5eed-5eed-5eed-000000000007'
+);
 
 COMMIT;
 SQL
@@ -650,27 +1078,30 @@ SELECT
   COUNT(DISTINCT establecimiento_id)::text AS valor
 FROM public.habitaciones_replica_cache
 WHERE establecimiento_id IN (
-  'e1e10000-5eed-5eed-5eed-000000000001',
-  'e2e20000-5eed-5eed-5eed-000000000002',
-  'e3e30000-5eed-5eed-5eed-000000000003'
+  'e1e10000-5eed-5eed-5eed-000000000001','e2e20000-5eed-5eed-5eed-000000000002',
+  'e3e30000-5eed-5eed-5eed-000000000003','e4e40000-5eed-5eed-5eed-000000000004',
+  'e5e50000-5eed-5eed-5eed-000000000005','e6e60000-5eed-5eed-5eed-000000000006',
+  'e7e70000-5eed-5eed-5eed-000000000007'
 )
 UNION ALL
 SELECT '  Habitaciones en cache:',
   COUNT(*)::text
   FROM public.habitaciones_replica_cache
   WHERE establecimiento_id IN (
-    'e1e10000-5eed-5eed-5eed-000000000001',
-    'e2e20000-5eed-5eed-5eed-000000000002',
-    'e3e30000-5eed-5eed-5eed-000000000003'
+    'e1e10000-5eed-5eed-5eed-000000000001','e2e20000-5eed-5eed-5eed-000000000002',
+    'e3e30000-5eed-5eed-5eed-000000000003','e4e40000-5eed-5eed-5eed-000000000004',
+    'e5e50000-5eed-5eed-5eed-000000000005','e6e60000-5eed-5eed-5eed-000000000006',
+    'e7e70000-5eed-5eed-5eed-000000000007'
   )
 UNION ALL
 SELECT '  Capacidad total (camas):',
   SUM(capacidad_calculada)::text
   FROM public.habitaciones_replica_cache
   WHERE establecimiento_id IN (
-    'e1e10000-5eed-5eed-5eed-000000000001',
-    'e2e20000-5eed-5eed-5eed-000000000002',
-    'e3e30000-5eed-5eed-5eed-000000000003'
+    'e1e10000-5eed-5eed-5eed-000000000001','e2e20000-5eed-5eed-5eed-000000000002',
+    'e3e30000-5eed-5eed-5eed-000000000003','e4e40000-5eed-5eed-5eed-000000000004',
+    'e5e50000-5eed-5eed-5eed-000000000005','e6e60000-5eed-5eed-5eed-000000000006',
+    'e7e70000-5eed-5eed-5eed-000000000007'
   )
 UNION ALL
 SELECT '  Partes diarios insertados:',
@@ -690,6 +1121,6 @@ SELECT '  Países distintos:',
 SQL
 
 echo
-ok "${BOLD}Seed completado. Los 3 establecimientos aparecen en el desplegable${NC}"
-ok "${BOLD}de Estadísticas filtrado por departamento Tarija.${NC}"
+ok "${BOLD}Seed completado. Los 7 establecimientos (7 municipios de Tarija) aparecen${NC}"
+ok "${BOLD}en el desplegable de Estadísticas filtrado por departamento Tarija.${NC}"
 echo -e "  Para limpiar sin reinsertar: ${YELLOW}bash db_script_local/seed-estadisticas.sh --clean${NC}"
