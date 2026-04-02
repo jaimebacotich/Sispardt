@@ -331,11 +331,12 @@ ok "Establecimientos insertados (33 habitaciones en total)"
 # habitaciones_replica_cache: refleja las 33 habitaciones
 # con capacidad_calculada = suma(tipo_cama.capacidad × cantidad)
 #
-# partes_diarios: 90 días × 3 establecimientos
-#   EST1: 20 entradas/día  → ~1 800 registros
-#   EST2: 11 entradas/día  → ~  990 registros
-#   EST3:  6 entradas/día  → ~  540 registros
-#   Total:                 → ~3 330 partes diarios
+# partes_diarios: 90 días fijos (2026-01-01 a 2026-03-31) × 3 establecimientos
+#   Variación diaria usando ondas sinusoidales → gráficas de línea con curvas reales
+#   EST1: 8–20 huéspedes/día (pico carnaval ~Feb 20) → ~1 200 registros
+#   EST2: 3–11 huéspedes/día (alto enero, cae en marzo) → ~  650 registros
+#   EST3: 2–8  huéspedes/día (oscilación ~mensual)   → ~  450 registros
+#   Total:                                           → ~2 300 partes diarios
 #
 # Distribución de nacionalidades (% aproximado):
 #   Bolivia 45%, Argentina 20%, Brasil 10%, Chile 10%,
@@ -345,7 +346,7 @@ ok "Establecimientos insertados (33 habitaciones en total)"
 #   Turismo 35%, Negocios 25%, Trabajo 20%,
 #   Familiar 10%, Salud 5%, Otro 5%
 # ============================================================
-info "Insertando réplica de habitaciones y partes diarios (90 días)..."
+info "Insertando réplica de habitaciones y partes diarios (enero–marzo 2026, variación diaria)..."
 
 psql_mov <<'SQL'
 BEGIN;
@@ -440,7 +441,7 @@ INSERT INTO public.habitaciones_replica_cache
 -- Salida nula: huéspedes de los últimos 2 días con n%5=0 (~20%)
 -- ----------------------------------------------------------
 
--- EST1: 20 huéspedes/día × 90 días = 1 800 registros (ocupación ~60%)
+-- EST1: 8–20 huéspedes/día, pico carnaval ~Feb 20 (ocupación 24%–60%)
 INSERT INTO public.partes_diarios
   (id, establecimiento_id, habitacion_id, persona_id,
    fecha_reporte, ingreso_at, salida_at,
@@ -503,17 +504,16 @@ SELECT
 FROM (
   SELECT
     d::date AS fecha,
-    (d::date - (CURRENT_DATE - INTERVAL '90 days')::date)::int AS day_idx,
-    g.n
-  FROM generate_series(
-    CURRENT_DATE - INTERVAL '90 days',
-    CURRENT_DATE - INTERVAL '1 day',
-    INTERVAL '1 day'
-  ) d
+    (d::date - '2026-01-01'::date)::int AS day_idx,
+    g.n,
+    -- Onda: mínimo ~8 en enero, pico 20 en carnaval (~20-feb = día 50), baja a 10 en marzo
+    (8 + round(12 * (0.5 + 0.5 * sin((d::date - '2026-01-01'::date)::float * pi() / 60 - pi() / 3))))::int AS load
+  FROM generate_series('2026-01-01'::date, '2026-03-31'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 20) g(n)
-) t;
+) t
+WHERE t.n <= t.load;
 
--- EST2: 11 huéspedes/día × 90 días = 990 registros (ocupación ~55%)
+-- EST2: 3–11 huéspedes/día, alto en enero (negocios inicio de año), cae en marzo
 INSERT INTO public.partes_diarios
   (id, establecimiento_id, habitacion_id, persona_id,
    fecha_reporte, ingreso_at, salida_at,
@@ -565,17 +565,16 @@ SELECT
 FROM (
   SELECT
     d::date AS fecha,
-    (d::date - (CURRENT_DATE - INTERVAL '90 days')::date)::int AS day_idx,
-    g.n
-  FROM generate_series(
-    CURRENT_DATE - INTERVAL '90 days',
-    CURRENT_DATE - INTERVAL '1 day',
-    INTERVAL '1 day'
-  ) d
+    (d::date - '2026-01-01'::date)::int AS day_idx,
+    g.n,
+    -- Onda: empieza alto (11 en enero), decrece hacia 3 en marzo, leve rebote en carnaval
+    (3 + round(8 * (0.5 + 0.5 * cos((d::date - '2026-01-01'::date)::float * pi() / 89) + 0.0)))::int AS load
+  FROM generate_series('2026-01-01'::date, '2026-03-31'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 11) g(n)
-) t;
+) t
+WHERE t.n <= t.load;
 
--- EST3: 6 huéspedes/día × 90 días = 540 registros (ocupación ~45%)
+-- EST3: 2–8 huéspedes/día, oscilación periódica ~mensual (patrón distinto)
 INSERT INTO public.partes_diarios
   (id, establecimiento_id, habitacion_id, persona_id,
    fecha_reporte, ingreso_at, salida_at,
@@ -623,15 +622,14 @@ SELECT
 FROM (
   SELECT
     d::date AS fecha,
-    (d::date - (CURRENT_DATE - INTERVAL '90 days')::date)::int AS day_idx,
-    g.n
-  FROM generate_series(
-    CURRENT_DATE - INTERVAL '90 days',
-    CURRENT_DATE - INTERVAL '1 day',
-    INTERVAL '1 day'
-  ) d
-  CROSS JOIN generate_series(1, 6) g(n)
-) t;
+    (d::date - '2026-01-01'::date)::int AS day_idx,
+    g.n,
+    -- Onda: oscilación ~mensual (período 30 días), entre 2 y 8 huéspedes
+    (2 + round(6 * abs(sin((d::date - '2026-01-01'::date)::float * pi() / 30))))::int AS load
+  FROM generate_series('2026-01-01'::date, '2026-03-31'::date, '1 day'::interval) d
+  CROSS JOIN generate_series(1, 8) g(n)
+) t
+WHERE t.n <= t.load;
 
 -- Restaurar triggers
 ALTER TABLE public.partes_diarios ENABLE TRIGGER tr_validar_capacidad_habitacion;

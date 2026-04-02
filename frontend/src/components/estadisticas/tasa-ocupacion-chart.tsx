@@ -25,20 +25,32 @@ interface TasaOcupacionChartProps {
 }
 
 export function TasaOcupacionChart({ data, isLoading }: TasaOcupacionChartProps) {
-  const tasaMensual = useMemo(() => {
-    const byMonth: Record<string, { sum: number; count: number }> = {};
+  const tasaSemanal = useMemo(() => {
+    // Determina el lunes de la semana para agrupar semanas completas
+    const weekStart = (dateStr: string): string => {
+      const d = new Date(dateStr + "T00:00:00");
+      const dow = d.getDay(); // 0=Dom, 1=Lun, ...
+      const diff = dow === 0 ? -6 : 1 - dow;
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().slice(0, 10);
+    };
+
+    const byWeek: Record<string, { sum: number; count: number }> = {};
     for (const d of data) {
-      const ym = d.fechaReporte.slice(0, 7); // "YYYY-MM"
-      if (!byMonth[ym]) byMonth[ym] = { sum: 0, count: 0 };
-      byMonth[ym].sum += d.porcentajeOcupacion ?? 0;
-      byMonth[ym].count += 1;
+      const ws = weekStart(d.fechaReporte);
+      if (!byWeek[ws]) byWeek[ws] = { sum: 0, count: 0 };
+      byWeek[ws].sum += d.porcentajeOcupacion ?? 0;
+      byWeek[ws].count += 1;
     }
-    return Object.entries(byMonth)
+    return Object.entries(byWeek)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([ym, { sum, count }]) => ({
-        mes: MES_CORTO[ym.slice(5, 7)] ?? ym.slice(5, 7),
-        tasa: +((sum / count)).toFixed(1),
-      }));
+      .map(([ws, { sum, count }]) => {
+        const [, mm, dd] = ws.split("-");
+        return {
+          semana: `${dd}/${MES_CORTO[mm] ?? mm}`,
+          tasa: +((sum / count)).toFixed(1),
+        };
+      });
   }, [data]);
 
   if (isLoading) {
@@ -48,7 +60,7 @@ export function TasaOcupacionChart({ data, isLoading }: TasaOcupacionChartProps)
   return (
     <ResponsiveContainer width="100%" height={200}>
       <LineChart
-        data={tasaMensual}
+        data={tasaSemanal}
         margin={{ top: 8, right: 16, left: -20, bottom: 0 }}
       >
         <CartesianGrid
@@ -57,10 +69,11 @@ export function TasaOcupacionChart({ data, isLoading }: TasaOcupacionChartProps)
           vertical={false}
         />
         <XAxis
-          dataKey="mes"
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          dataKey="semana"
+          tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
           axisLine={false}
           tickLine={false}
+          interval={1}
         />
         <YAxis
           tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
