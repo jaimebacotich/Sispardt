@@ -89,10 +89,16 @@ export function EstablecimientosList() {
       .map((c) => ({ id: String(c.clasificacionId!), nombre: c.clasificacionNombre ?? "" }));
   }, [categorias]);
 
-  // Derivar divisiones secundarias (provincias) únicas desde localidades reales
+  // Solo localidades del departamento de Tarija (divisionPrincipalId = 6)
+  const localidadesTarija = useMemo(
+    () => localidades.filter((l) => l.divisionPrincipalId === 6),
+    [localidades]
+  );
+
+  // Derivar provincias únicas de Tarija
   const divisiones = useMemo(() => {
     const seen = new Set<number>();
-    return localidades
+    return localidadesTarija
       .filter((l) => {
         if (!l.divisionSecundariaId || seen.has(l.divisionSecundariaId)) return false;
         seen.add(l.divisionSecundariaId);
@@ -100,15 +106,15 @@ export function EstablecimientosList() {
       })
       .map((l) => ({ id: String(l.divisionSecundariaId!), nombre: l.divisionSecundariaNombre ?? "" }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [localidades]);
+  }, [localidadesTarija]);
 
-  // Localidades filtradas por división seleccionada
+  // Municipios filtrados por provincia seleccionada (siempre dentro de Tarija)
   const localidadesFiltradas = useMemo(
     () =>
       divisionId === "todos"
-        ? localidades
-        : localidades.filter((l) => String(l.divisionSecundariaId) === divisionId),
-    [localidades, divisionId]
+        ? localidadesTarija
+        : localidadesTarija.filter((l) => String(l.divisionSecundariaId) === divisionId),
+    [localidadesTarija, divisionId]
   );
 
   // Categorías filtradas por clasificación seleccionada
@@ -316,6 +322,18 @@ export function EstablecimientosList() {
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
             <Hotel size={14} />
             <span className="font-medium">Filtro geográfico:</span>
+          </div>
+
+          {/* País fijo */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground">País:</span>
+            <span className="bg-muted text-foreground px-2 py-0.5 rounded font-medium">Bolivia</span>
+          </div>
+
+          {/* Departamento fijo */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground">Departamento:</span>
+            <span className="bg-muted text-foreground px-2 py-0.5 rounded font-medium">Tarija</span>
           </div>
 
           {/* División Secundaria */}
