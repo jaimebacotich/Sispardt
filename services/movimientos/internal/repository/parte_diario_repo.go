@@ -363,11 +363,23 @@ func listParteSQL(where string, limitIdx, offsetIdx int) string {
 
 func scanParteRow(rows pgx.Rows) (*domain.ParteDiarioResponse, error) {
 	var p domain.ParteDiarioResponse
-	var per domain.PersonaResponse
 	var salidaAt *time.Time
 	var ingresoAt time.Time
-	var creadoAt, perCreadoAt time.Time
+	var creadoAt time.Time
+
+	// Persona fields are nullable (LEFT JOIN may miss when persona_id IS NULL)
 	var perID *string
+	var perTipoDocID *int
+	var perTipoDocSigla *string
+	var perDocIdentidad *string
+	var perPaisOrigenID *int
+	var perPaisOrigenNombre *string
+	var perNombre *string
+	var perApPat *string
+	var perApMat *string
+	var perFechaNac *string
+	var perProfesion *string
+	var perCreadoAt *time.Time
 
 	if err := rows.Scan(
 		&p.ID, &p.EstablecimientoID, &p.HabitacionID,
@@ -379,10 +391,10 @@ func scanParteRow(rows pgx.Rows) (*domain.ParteDiarioResponse, error) {
 		&p.LocalidadDestinoID, &p.LocalidadDestinoNombre,
 		&p.MotivoViajeID, &p.MotivoViajeNombre,
 		&p.EstadoOperativo, &p.CondicionEntrega, &creadoAt,
-		&perID, &per.TipoDocumentoID, &per.TipoDocumentoSigla,
-		&per.DocumentoIdentidad, &per.PaisOrigenID, &per.PaisOrigenNombre,
-		&per.Nombre, &per.ApellidoPaterno, &per.ApellidoMaterno,
-		&per.FechaNacimiento, &per.Profesion, &perCreadoAt,
+		&perID, &perTipoDocID, &perTipoDocSigla,
+		&perDocIdentidad, &perPaisOrigenID, &perPaisOrigenNombre,
+		&perNombre, &perApPat, &perApMat,
+		&perFechaNac, &perProfesion, &perCreadoAt,
 	); err != nil {
 		return nil, err
 	}
@@ -395,8 +407,32 @@ func scanParteRow(rows pgx.Rows) (*domain.ParteDiarioResponse, error) {
 	p.CreadoAt = creadoAt.Format(time.RFC3339)
 
 	if perID != nil {
-		per.ID = *perID
-		per.CreadoAt = perCreadoAt.Format(time.RFC3339)
+		per := domain.PersonaResponse{ID: *perID}
+		per.TipoDocumentoID = perTipoDocID
+		per.TipoDocumentoSigla = perTipoDocSigla
+		if perDocIdentidad != nil {
+			per.DocumentoIdentidad = *perDocIdentidad
+		}
+		if perPaisOrigenID != nil {
+			per.PaisOrigenID = *perPaisOrigenID
+		}
+		if perPaisOrigenNombre != nil {
+			per.PaisOrigenNombre = *perPaisOrigenNombre
+		}
+		if perNombre != nil {
+			per.Nombre = *perNombre
+		}
+		if perApPat != nil {
+			per.ApellidoPaterno = *perApPat
+		}
+		per.ApellidoMaterno = perApMat
+		if perFechaNac != nil {
+			per.FechaNacimiento = *perFechaNac
+		}
+		per.Profesion = perProfesion
+		if perCreadoAt != nil {
+			per.CreadoAt = perCreadoAt.Format(time.RFC3339)
+		}
 		p.Persona = &per
 	}
 	return &p, nil
@@ -454,9 +490,9 @@ func (r *ParteDiarioRepo) List(ctx context.Context, params domain.ListPartesPara
 		idx++
 	}
 
-	if len(conds) == 0 {
-		conds = append(conds, "TRUE")
-	}
+	// Excluir partes sin persona (datos incompletos — seed histórico sin personas)
+	conds = append(conds, "pd.persona_id IS NOT NULL")
+
 	where := strings.Join(conds, " AND ")
 
 	var total int
