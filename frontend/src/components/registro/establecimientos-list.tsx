@@ -340,7 +340,7 @@ export function EstablecimientosList() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Provincia</span>
             <Select value={divisionId} onValueChange={(v) => handleDivisionChange(v ?? "todos")}>
-              <SelectTrigger className="h-8 text-xs w-40">
+              <SelectTrigger className="h-8 text-xs w-40 bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300">
                 <SelectValue
                   label={
                     divisionId === "todos"
@@ -364,7 +364,7 @@ export function EstablecimientosList() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Municipio</span>
             <Select value={localidadId} onValueChange={(v) => setLocalidadId(v ?? "todos")}>
-              <SelectTrigger className="h-8 text-xs w-40">
+              <SelectTrigger className="h-8 text-xs w-40 bg-violet-50 border-violet-200 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/40 dark:border-violet-800 dark:text-violet-300">
                 <SelectValue
                   label={
                     localidadId === "todos"
@@ -447,7 +447,7 @@ export function EstablecimientosList() {
             value={clasificacionId}
             onValueChange={(v) => handleClasificacionChange(v ?? "todos")}
           >
-            <SelectTrigger className="h-9 text-sm w-44">
+            <SelectTrigger className="h-9 text-sm w-44 bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300">
               <SelectValue
                 placeholder="Clasificación"
                 label={
@@ -472,7 +472,7 @@ export function EstablecimientosList() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground whitespace-nowrap">Categoría:</span>
           <Select value={categoriaId} onValueChange={(v) => setCategoriaId(v ?? "todos")}>
-            <SelectTrigger className="h-9 text-sm w-52">
+            <SelectTrigger className="h-9 text-sm w-52 bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300">
               <SelectValue
                 placeholder="Categoría"
                 label={
