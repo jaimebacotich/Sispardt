@@ -23,6 +23,14 @@ export function OcupacionChart({ data, isLoading }: OcupacionChartProps) {
     return <Skeleton className="w-full h-[220px]" />;
   }
 
+  if (!data.length) {
+    return (
+      <div className="flex items-center justify-center h-[220px] text-sm text-muted-foreground">
+        Sin datos para el período seleccionado
+      </div>
+    );
+  }
+
   const chartData = data.map((d) => ({
     fecha: d.fechaReporte,
     huespedes: d.totalHuespedes,

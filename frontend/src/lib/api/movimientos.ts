@@ -85,50 +85,55 @@ export const movimientosApi = {
   // ── Estadísticas ──────────────────────────────────────────
   getOcupacion: (
     token: string,
-    params: { fechaDesde: string; fechaHasta: string; establecimientoId?: string }
+    params: { fechaDesde: string; fechaHasta: string; establecimientoIds?: string[] }
   ) => {
     const q = new URLSearchParams({
       fecha_desde: params.fechaDesde,
       fecha_hasta: params.fechaHasta,
     });
-    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
+    if (params.establecimientoIds?.length === 1) q.set("establecimiento_id", params.establecimientoIds[0]);
+    else if (params.establecimientoIds && params.establecimientoIds.length > 1) q.set("establecimiento_ids", params.establecimientoIds.join(","));
     return apiClient.get<OcupacionDiaria[]>(`/api/v1/estadisticas/ocupacion?${q}`, token);
   },
 
   getResumen: (
     token: string,
-    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }
+    params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string }
   ) => {
     const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
-    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
+    if (params.establecimientoIds?.length === 1) q.set("establecimiento_id", params.establecimientoIds[0]);
+    else if (params.establecimientoIds && params.establecimientoIds.length > 1) q.set("establecimiento_ids", params.establecimientoIds.join(","));
     return apiClient.get<ResumenEstadisticas>(`/api/v1/estadisticas/resumen?${q}`, token);
   },
 
   getNacionalidades: (
     token: string,
-    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }
+    params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string }
   ) => {
     const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
-    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
+    if (params.establecimientoIds?.length === 1) q.set("establecimiento_id", params.establecimientoIds[0]);
+    else if (params.establecimientoIds && params.establecimientoIds.length > 1) q.set("establecimiento_ids", params.establecimientoIds.join(","));
     return apiClient.get<NacionalidadStat[]>(`/api/v1/estadisticas/nacionalidades?${q}`, token);
   },
 
   getMotivosViaje: (
     token: string,
-    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string; agrupacion?: string }
+    params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string; agrupacion?: string }
   ) => {
     const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
-    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
+    if (params.establecimientoIds?.length === 1) q.set("establecimiento_id", params.establecimientoIds[0]);
+    else if (params.establecimientoIds && params.establecimientoIds.length > 1) q.set("establecimiento_ids", params.establecimientoIds.join(","));
     if (params.agrupacion) q.set("agrupacion", params.agrupacion);
     return apiClient.get<MotivosPeriodo[]>(`/api/v1/estadisticas/motivos?${q}`, token);
   },
 
   getTiposHabitacion: (
     token: string,
-    params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }
+    params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string }
   ) => {
     const q = new URLSearchParams({ fecha_desde: params.fechaDesde, fecha_hasta: params.fechaHasta });
-    if (params.establecimientoId) q.set("establecimiento_id", params.establecimientoId);
+    if (params.establecimientoIds?.length === 1) q.set("establecimiento_id", params.establecimientoIds[0]);
+    else if (params.establecimientoIds && params.establecimientoIds.length > 1) q.set("establecimiento_ids", params.establecimientoIds.join(","));
     return apiClient.get<TipoHabitacionStat[]>(`/api/v1/estadisticas/tipos-habitacion?${q}`, token);
   },
 };

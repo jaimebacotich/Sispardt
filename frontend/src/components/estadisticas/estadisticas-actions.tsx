@@ -9,7 +9,7 @@ export function EstadisticasActions() {
     <div className="flex items-center gap-2">
       <button
         onClick={() => window.print()}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 transition-colors"
       >
         <Printer size={13} />
         Imprimir

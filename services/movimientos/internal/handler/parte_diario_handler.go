@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -258,11 +259,11 @@ func NewEstadisticasHandler(svc *service.ParteDiarioService) *EstadisticasHandle
 }
 
 func (h *EstadisticasHandler) OcupacionDiaria(w http.ResponseWriter, r *http.Request) {
-	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	estIDs, desde, hasta, ok := h.parseStatsParams(w, r)
 	if !ok {
 		return
 	}
-	result, err := h.svc.OcupacionDiaria(r.Context(), estID, desde, hasta)
+	result, err := h.svc.OcupacionDiaria(r.Context(), estIDs, desde, hasta)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -271,11 +272,11 @@ func (h *EstadisticasHandler) OcupacionDiaria(w http.ResponseWriter, r *http.Req
 }
 
 func (h *EstadisticasHandler) Resumen(w http.ResponseWriter, r *http.Request) {
-	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	estIDs, desde, hasta, ok := h.parseStatsParams(w, r)
 	if !ok {
 		return
 	}
-	result, err := h.svc.ResumenEstadisticas(r.Context(), estID, desde, hasta)
+	result, err := h.svc.ResumenEstadisticas(r.Context(), estIDs, desde, hasta)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -284,11 +285,11 @@ func (h *EstadisticasHandler) Resumen(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EstadisticasHandler) Nacionalidades(w http.ResponseWriter, r *http.Request) {
-	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	estIDs, desde, hasta, ok := h.parseStatsParams(w, r)
 	if !ok {
 		return
 	}
-	result, err := h.svc.Nacionalidades(r.Context(), estID, desde, hasta)
+	result, err := h.svc.Nacionalidades(r.Context(), estIDs, desde, hasta)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -297,7 +298,7 @@ func (h *EstadisticasHandler) Nacionalidades(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *EstadisticasHandler) MotivosViaje(w http.ResponseWriter, r *http.Request) {
-	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	estIDs, desde, hasta, ok := h.parseStatsParams(w, r)
 	if !ok {
 		return
 	}
@@ -305,7 +306,7 @@ func (h *EstadisticasHandler) MotivosViaje(w http.ResponseWriter, r *http.Reques
 	if agrupacion == "" {
 		agrupacion = "mes"
 	}
-	result, err := h.svc.MotivosViaje(r.Context(), estID, desde, hasta, agrupacion)
+	result, err := h.svc.MotivosViaje(r.Context(), estIDs, desde, hasta, agrupacion)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -314,11 +315,11 @@ func (h *EstadisticasHandler) MotivosViaje(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *EstadisticasHandler) TiposHabitacion(w http.ResponseWriter, r *http.Request) {
-	estID, desde, hasta, ok := h.parseStatsParams(w, r)
+	estIDs, desde, hasta, ok := h.parseStatsParams(w, r)
 	if !ok {
 		return
 	}
-	result, err := h.svc.TiposHabitacion(r.Context(), estID, desde, hasta)
+	result, err := h.svc.TiposHabitacion(r.Context(), estIDs, desde, hasta)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -327,21 +328,28 @@ func (h *EstadisticasHandler) TiposHabitacion(w http.ResponseWriter, r *http.Req
 }
 
 // parseStatsParams extrae y valida fecha_desde y fecha_hasta.
-// establecimiento_id es opcional: si está vacío se agregan todos los establecimientos.
+// Acepta establecimiento_id (único) o establecimiento_ids (lista separada por comas).
 // Para recepcionistas siempre se fuerza el establecimiento del token JWT.
-func (h *EstadisticasHandler) parseStatsParams(w http.ResponseWriter, r *http.Request) (estID, desde, hasta string, ok bool) {
+func (h *EstadisticasHandler) parseStatsParams(w http.ResponseWriter, r *http.Request) (estIDs []string, desde, hasta string, ok bool) {
 	claims := auth.FromContext(r.Context())
-	estID = r.URL.Query().Get("establecimiento_id")
 	if claims.HasRole(auth.RoleRecepcionista) {
-		estID = claims.EstablecimientoID
+		if claims.EstablecimientoID != "" {
+			estIDs = []string{claims.EstablecimientoID}
+		}
+	} else {
+		if single := r.URL.Query().Get("establecimiento_id"); single != "" {
+			estIDs = []string{single}
+		} else if multi := r.URL.Query().Get("establecimiento_ids"); multi != "" {
+			estIDs = strings.Split(multi, ",")
+		}
 	}
 	desde = r.URL.Query().Get("fecha_desde")
 	hasta = r.URL.Query().Get("fecha_hasta")
 	if desde == "" || hasta == "" {
 		jsonError(w, http.StatusBadRequest, "fecha_desde y fecha_hasta son requeridas")
-		return "", "", "", false
+		return nil, "", "", false
 	}
-	return estID, desde, hasta, true
+	return estIDs, desde, hasta, true
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

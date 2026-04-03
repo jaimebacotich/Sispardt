@@ -736,7 +736,7 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 
 // ─── Estadísticas ─────────────────────────────────────────────────────────────
 
-func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, establecimientoID string, desde, hasta time.Time) ([]domain.OcupacionDiaria, error) {
+func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, estIDs []string, desde, hasta time.Time) ([]domain.OcupacionDiaria, error) {
 	const sql = `
 		SELECT od.fecha_reporte::text,
 		       SUM(od.total_huespedes)          AS total_huespedes,
@@ -744,12 +744,12 @@ func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, establecimientoID
 		FROM public.vw_ocupacion_diaria od
 		LEFT JOIN public.vw_capacidad_establecimiento vce
 		       ON vce.establecimiento_id = od.establecimiento_id
-		WHERE ($1::uuid IS NULL OR od.establecimiento_id = $1::uuid)
+		WHERE ($1::text IS NULL OR od.establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 		  AND od.fecha_reporte BETWEEN $2 AND $3
 		GROUP BY od.fecha_reporte
 		ORDER BY od.fecha_reporte`
 
-	rows, err := r.statsPool.Query(ctx, sql, estParam(establecimientoID), desde, hasta)
+	rows, err := r.statsPool.Query(ctx, sql, estIDsParam(estIDs), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("ocupacion diaria: %w", err)
 	}
@@ -773,12 +773,12 @@ func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, establecimientoID
 	return results, rows.Err()
 }
 
-func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimientoID string, desde, hasta time.Time) (domain.ResumenEstadisticas, error) {
+func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, estIDs []string, desde, hasta time.Time) (domain.ResumenEstadisticas, error) {
 	const sql = `
 		WITH capacidad AS (
 			SELECT COALESCE(SUM(capacidad_total), 0) AS capacidad_total
 			FROM public.vw_capacidad_establecimiento
-			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
+			WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 		),
 		pernoctes AS (
 			SELECT
@@ -793,7 +793,7 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimien
 				  AND pais_procedencia_id NOT IN (
 				      SELECT id FROM public.paises_replica_cache WHERE codigo_iso = 'BOL'))     AS total_extranjeros
 			FROM public.partes_diarios
-			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
+			WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 			  AND fecha_reporte BETWEEN $2 AND $3
 			  AND estado_operativo = 'ACTIVO'
 		),
@@ -802,14 +802,14 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimien
 			       SUM(od.total_huespedes)                              AS total_huespedes,
 			       COALESCE((SELECT capacidad_total FROM capacidad), 0) AS capacidad_total
 			FROM public.vw_ocupacion_diaria od
-			WHERE ($1::uuid IS NULL OR od.establecimiento_id = $1::uuid)
+			WHERE ($1::text IS NULL OR od.establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 			  AND od.fecha_reporte BETWEEN $2 AND $3
 			GROUP BY od.fecha_reporte
 		),
 		estadias AS (
 			SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(salida_at, NOW()) - ingreso_at)) / 86400.0), 0) AS estadia_prom
 			FROM public.partes_diarios
-			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
+			WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 			  AND estado_operativo = 'ACTIVO'
 			  AND DATE(ingreso_at) BETWEEN $2 AND $3
 		)
@@ -827,7 +827,7 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimien
 			COALESCE((SELECT COUNT(DISTINCT fecha_reporte) FROM ocupacion_diaria), 0) AS dias_con_datos`
 
 	var res domain.ResumenEstadisticas
-	err := r.statsPool.QueryRow(ctx, sql, estParam(establecimientoID), desde, hasta).Scan(
+	err := r.statsPool.QueryRow(ctx, sql, estIDsParam(estIDs), desde, hasta).Scan(
 		&res.TotalHuespedes,
 		&res.TotalExtranjeros,
 		&res.OcupacionPromedio,
@@ -844,12 +844,12 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, establecimien
 	return res, nil
 }
 
-func (r *ParteDiarioRepo) Nacionalidades(ctx context.Context, establecimientoID string, desde, hasta time.Time) ([]domain.NacionalidadStat, error) {
+func (r *ParteDiarioRepo) Nacionalidades(ctx context.Context, estIDs []string, desde, hasta time.Time) ([]domain.NacionalidadStat, error) {
 	const sql = `
 		WITH totales AS (
 			SELECT pais_id, pais_nombre, SUM(cantidad_ingresos) AS cantidad
 			FROM public.vw_estadistica_ingresos
-			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
+			WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 			  AND fecha_reporte BETWEEN $2 AND $3
 			GROUP BY pais_id, pais_nombre
 		),
@@ -860,7 +860,7 @@ func (r *ParteDiarioRepo) Nacionalidades(ctx context.Context, establecimientoID 
 		ORDER BY t.cantidad DESC
 		LIMIT 10`
 
-	rows, err := r.statsPool.Query(ctx, sql, estParam(establecimientoID), desde, hasta)
+	rows, err := r.statsPool.Query(ctx, sql, estIDsParam(estIDs), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("nacionalidades: %w", err)
 	}
@@ -880,7 +880,7 @@ func (r *ParteDiarioRepo) Nacionalidades(ctx context.Context, establecimientoID 
 	return results, rows.Err()
 }
 
-func (r *ParteDiarioRepo) MotivosViaje(ctx context.Context, establecimientoID string, desde, hasta time.Time, agrupacion string) ([]domain.MotivosPeriodo, error) {
+func (r *ParteDiarioRepo) MotivosViaje(ctx context.Context, estIDs []string, desde, hasta time.Time, agrupacion string) ([]domain.MotivosPeriodo, error) {
 	var periodoExpr string
 	switch agrupacion {
 	case "dia":
@@ -898,13 +898,13 @@ func (r *ParteDiarioRepo) MotivosViaje(ctx context.Context, establecimientoID st
 		       COUNT(*)                             AS cantidad
 		FROM public.partes_diarios pd
 		LEFT JOIN public.motivos_viaje mv ON mv.id = pd.motivo_viaje_id
-		WHERE ($1::uuid IS NULL OR pd.establecimiento_id = $1::uuid)
+		WHERE ($1::text IS NULL OR pd.establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 		  AND pd.fecha_reporte BETWEEN $2 AND $3
 		  AND pd.estado_operativo = 'ACTIVO'
 		GROUP BY periodo, mv.id, mv.nombre
 		ORDER BY periodo ASC, cantidad DESC`, periodoExpr)
 
-	rows, err := r.statsPool.Query(ctx, query, estParam(establecimientoID), desde, hasta)
+	rows, err := r.statsPool.Query(ctx, query, estIDsParam(estIDs), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("motivos viaje: %w", err)
 	}
@@ -939,39 +939,55 @@ func (r *ParteDiarioRepo) MotivosViaje(ctx context.Context, establecimientoID st
 	return results, nil
 }
 
-func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, establecimientoID string, desde, hasta time.Time) ([]domain.TipoHabitacionStat, error) {
+func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, estIDs []string, desde, hasta time.Time) ([]domain.TipoHabitacionStat, error) {
 	const sql = `
-		WITH capacidad AS (
+		WITH cache AS (
 			SELECT tipo_habitacion,
-			       SUM(capacidad_calculada) AS total_camas
+			       SUM(GREATEST(capacidad_calculada, 0)) AS total_camas
 			FROM public.habitaciones_replica_cache
-			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
+			WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 			GROUP BY tipo_habitacion
+		),
+		partes_tipos AS (
+			SELECT hab_tipo_snapshot AS tipo_habitacion,
+			       COUNT(DISTINCT habitacion_id) AS total_rooms
+			FROM public.partes_diarios
+			WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
+			  AND fecha_reporte BETWEEN $2 AND $3
+			  AND hab_tipo_snapshot IS NOT NULL
+			GROUP BY hab_tipo_snapshot
+		),
+		capacidad AS (
+			SELECT COALESCE(c.tipo_habitacion, p.tipo_habitacion) AS tipo_habitacion,
+			       COALESCE(NULLIF(c.total_camas, 0), p.total_rooms)::bigint AS total_camas
+			FROM cache c
+			FULL OUTER JOIN partes_tipos p ON p.tipo_habitacion = c.tipo_habitacion
 		),
 		ocupadas AS (
 			SELECT hab_tipo_snapshot AS tipo_habitacion,
 			       COUNT(DISTINCT habitacion_id) AS ocupadas_promedio
 			FROM public.partes_diarios
-			WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid)
+			WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 			  AND fecha_reporte BETWEEN $2 AND $3
 			  AND estado_operativo = 'ACTIVO'
 			  AND ingreso_at < (fecha_reporte + INTERVAL '1 day')
 			  AND (salida_at IS NULL OR salida_at >= (fecha_reporte + INTERVAL '1 day'))
 			GROUP BY hab_tipo_snapshot
 		),
-		dist_total AS (SELECT COALESCE(SUM(total_camas), 0) AS total FROM capacidad)
+		dist_total AS (SELECT COALESCE(SUM(total_camas), 0) AS total FROM capacidad WHERE total_camas > 0)
 		SELECT
 			c.tipo_habitacion,
-			c.total_camas,
+			COALESCE(c.total_camas, 0),
 			COALESCE(o.ocupadas_promedio, 0),
 			COALESCE(ROUND(COALESCE(o.ocupadas_promedio, 0)::numeric / NULLIF(c.total_camas, 0) * 100, 1), 0),
 			COALESCE(ROUND(c.total_camas::numeric / NULLIF(dt.total, 0) * 100, 1), 0)
 		FROM capacidad c
 		LEFT JOIN ocupadas o ON o.tipo_habitacion = c.tipo_habitacion
 		CROSS JOIN dist_total dt
+		WHERE c.total_camas > 0
 		ORDER BY c.total_camas DESC`
 
-	rows, err := r.statsPool.Query(ctx, sql, estParam(establecimientoID), desde, hasta)
+	rows, err := r.statsPool.Query(ctx, sql, estIDsParam(estIDs), desde, hasta)
 	if err != nil {
 		return nil, fmt.Errorf("tipos habitacion: %w", err)
 	}
@@ -991,12 +1007,13 @@ func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, establecimientoID
 	return results, rows.Err()
 }
 
-// estParam convierte un establecimiento_id string a interface{} para pgx.
-// Retorna nil (NULL en SQL) cuando el ID está vacío, lo que hace que la cláusula
-// WHERE ($1::uuid IS NULL OR establecimiento_id = $1::uuid) incluya todos los establecimientos.
-func estParam(id string) interface{} {
-	if id == "" {
+// estIDsParam convierte una lista de establecimiento_ids a interface{} para pgx.
+// Retorna nil (NULL en SQL) cuando la lista está vacía, lo que hace que la cláusula
+// WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1,',')::uuid[]))
+// incluya todos los establecimientos. Con 1+ IDs filtra solo esos.
+func estIDsParam(ids []string) interface{} {
+	if len(ids) == 0 {
 		return nil
 	}
-	return id
+	return strings.Join(ids, ",")
 }

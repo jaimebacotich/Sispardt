@@ -128,21 +128,29 @@ export function EstadisticasDashboard() {
   // Municipio seleccionado sin establecimientos = no hay datos que mostrar
   const sinEstablecimientos = !!localidadId && !loadingEst && estList.length === 0;
 
-  // localidadId se incluye en statsParams para que React Query invalide el caché al cambiar municipio,
-  // aunque el backend no lo use (la API solo lee establecimientoId, fechaDesde, fechaHasta).
-  const statsParams = {
-    establecimientoId: establecimientoId || undefined,
-    localidadId: localidadId || undefined,
-    fechaDesde: fd,
-    fechaHasta: fh,
-  };
-  const datesReady = !customInvalid && !!fd && !!fh && !sinEstablecimientos;
+  // IDs efectivos para filtrar en el backend:
+  // - Si hay un establecimiento específico seleccionado → solo ese
+  // - Si hay municipio seleccionado pero "todos los establecimientos" → todos los del municipio
+  // - Si no hay ningún filtro → [] (sin filtro = todos los del sistema)
+  const statsEstIds = useMemo<string[]>(() => {
+    if (establecimientoId) return [establecimientoId];
+    if (localidadId && estList.length > 0) return estList.map((e) => e.id);
+    return [];
+  }, [establecimientoId, localidadId, estList]);
 
-  const { data: resumen,        isLoading: loadingResumen   } = useResumenEstadisticas(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
-  const { data: ocupacionData,  isLoading: loadingOcupacion } = useOcupacion(establecimientoId, datesReady ? fd : "", datesReady ? fh : "", localidadId);
-  const { data: nacionalidades, isLoading: loadingNac       } = useNacionalidades(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
+  // También bloqueamos mientras carga la lista de establecimientos del municipio
+  // seleccionado: de lo contrario statsEstIds=[] y se dispararía una query sin filtro.
+  const datesReady = !customInvalid && !!fd && !!fh && !sinEstablecimientos && !(!!localidadId && loadingEst);
+
+  const statsParams = datesReady
+    ? { establecimientoIds: statsEstIds.length > 0 ? statsEstIds : undefined, fechaDesde: fd, fechaHasta: fh }
+    : { fechaDesde: "", fechaHasta: "" };
+
+  const { data: resumen,        isLoading: loadingResumen   } = useResumenEstadisticas(statsParams);
+  const { data: ocupacionData,  isLoading: loadingOcupacion } = useOcupacion(statsParams);
+  const { data: nacionalidades, isLoading: loadingNac       } = useNacionalidades(statsParams);
   const { data: motivos,        isLoading: loadingMotivos   } = useMotivosViaje(datesReady ? { ...statsParams, agrupacion: agrupacionDesdePeriodo(periodo) } : { fechaDesde: "", fechaHasta: "" });
-  const { data: tiposHab,       isLoading: loadingTipos     } = useTiposHabitacion(datesReady ? statsParams : { fechaDesde: "", fechaHasta: "" });
+  const { data: tiposHab,       isLoading: loadingTipos     } = useTiposHabitacion(statsParams);
 
   const ahora = new Date();
   const actualizado =
@@ -164,7 +172,7 @@ export function EstadisticasDashboard() {
                 setLocalidadId(e.target.value);
                 setEstablecimientoId(""); // resetear establecimiento al cambiar localidad
               }}
-              className="appearance-none bg-primary/10 border border-primary/40 rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer min-w-[180px]"
+              className="appearance-none bg-sky-500/10 border border-sky-500/40 rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500/30 cursor-pointer min-w-[180px]"
             >
               <option value="">Todos los Municipios</option>
               {localidades.map((l) => (
@@ -185,7 +193,7 @@ export function EstadisticasDashboard() {
                 <select
                   value={establecimientoId}
                   onChange={(e) => setEstablecimientoId(e.target.value)}
-                  className="appearance-none bg-primary/10 border border-primary/40 rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer min-w-[230px]"
+                  className="appearance-none bg-sky-500/10 border border-sky-500/40 rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500/30 cursor-pointer min-w-[230px]"
                 >
                   <option value="">Todos los establecimientos</option>
                   {estList.map((e) => (

@@ -45,6 +45,14 @@ export function MotivosViajeChart({ data, isLoading }: MotivosViajeChartProps) {
     return <Skeleton className="w-full h-[240px]" />;
   }
 
+  if (!data.length) {
+    return (
+      <div className="flex items-center justify-center h-[240px] text-sm text-muted-foreground">
+        Sin datos para el período seleccionado
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={240}>
       <BarChart

@@ -197,44 +197,44 @@ func (s *ParteDiarioService) CreateCierre(ctx context.Context, userID, cerradoPo
 
 // ─── Estadísticas ─────────────────────────────────────────────────────────────
 
-func (s *ParteDiarioService) OcupacionDiaria(ctx context.Context, establecimientoID, desde, hasta string) ([]domain.OcupacionDiaria, error) {
+func (s *ParteDiarioService) OcupacionDiaria(ctx context.Context, estIDs []string, desde, hasta string) ([]domain.OcupacionDiaria, error) {
 	desdeT, hastaT, err := parseFechas(desde, hasta)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.OcupacionDiaria(ctx, establecimientoID, desdeT, hastaT)
+	return s.repo.OcupacionDiaria(ctx, estIDs, desdeT, hastaT)
 }
 
-func (s *ParteDiarioService) ResumenEstadisticas(ctx context.Context, establecimientoID, desde, hasta string) (domain.ResumenEstadisticas, error) {
+func (s *ParteDiarioService) ResumenEstadisticas(ctx context.Context, estIDs []string, desde, hasta string) (domain.ResumenEstadisticas, error) {
 	desdeT, hastaT, err := parseFechas(desde, hasta)
 	if err != nil {
 		return domain.ResumenEstadisticas{}, err
 	}
-	return s.repo.ResumenEstadisticas(ctx, establecimientoID, desdeT, hastaT)
+	return s.repo.ResumenEstadisticas(ctx, estIDs, desdeT, hastaT)
 }
 
-func (s *ParteDiarioService) Nacionalidades(ctx context.Context, establecimientoID, desde, hasta string) ([]domain.NacionalidadStat, error) {
+func (s *ParteDiarioService) Nacionalidades(ctx context.Context, estIDs []string, desde, hasta string) ([]domain.NacionalidadStat, error) {
 	desdeT, hastaT, err := parseFechas(desde, hasta)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.Nacionalidades(ctx, establecimientoID, desdeT, hastaT)
+	return s.repo.Nacionalidades(ctx, estIDs, desdeT, hastaT)
 }
 
-func (s *ParteDiarioService) MotivosViaje(ctx context.Context, establecimientoID, desde, hasta, agrupacion string) ([]domain.MotivosPeriodo, error) {
+func (s *ParteDiarioService) MotivosViaje(ctx context.Context, estIDs []string, desde, hasta, agrupacion string) ([]domain.MotivosPeriodo, error) {
 	desdeT, hastaT, err := parseFechas(desde, hasta)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.MotivosViaje(ctx, establecimientoID, desdeT, hastaT, agrupacion)
+	return s.repo.MotivosViaje(ctx, estIDs, desdeT, hastaT, agrupacion)
 }
 
-func (s *ParteDiarioService) TiposHabitacion(ctx context.Context, establecimientoID, desde, hasta string) ([]domain.TipoHabitacionStat, error) {
+func (s *ParteDiarioService) TiposHabitacion(ctx context.Context, estIDs []string, desde, hasta string) ([]domain.TipoHabitacionStat, error) {
 	desdeT, hastaT, err := parseFechas(desde, hasta)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.TiposHabitacion(ctx, establecimientoID, desdeT, hastaT)
+	return s.repo.TiposHabitacion(ctx, estIDs, desdeT, hastaT)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

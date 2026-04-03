@@ -240,19 +240,18 @@ export function useHabitacionesEstadoEnFecha(fecha: string) {
 }
 
 // ── Estadísticas de ocupación ──────────────────────────────────────────────
-export function useOcupacion(establecimientoId: string, fechaDesde: string, fechaHasta: string, localidadId?: string) {
+export function useOcupacion(params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string }) {
   const { accessToken } = useAuth();
   return useQuery({
-    queryKey: MOV_KEYS.ocupacion({ establecimientoId, fechaDesde, fechaHasta, localidadId }),
-    queryFn: () =>
-      movimientosApi.getOcupacion(accessToken!, { establecimientoId: establecimientoId || undefined, fechaDesde, fechaHasta }),
-    enabled: !USE_MOCK && !!accessToken && !!fechaDesde && !!fechaHasta,
+    queryKey: MOV_KEYS.ocupacion(params),
+    queryFn: () => movimientosApi.getOcupacion(accessToken!, params),
+    enabled: !USE_MOCK && !!accessToken && !!params.fechaDesde && !!params.fechaHasta,
     staleTime: 5 * 60 * 1000,
   });
 }
 
 // ── Resumen KPI ────────────────────────────────────────────────────────────
-export function useResumenEstadisticas(params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }) {
+export function useResumenEstadisticas(params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string }) {
   const { accessToken } = useAuth();
   return useQuery({
     queryKey: MOV_KEYS.resumen(params),
@@ -263,7 +262,7 @@ export function useResumenEstadisticas(params: { establecimientoId?: string; fec
 }
 
 // ── Top Nacionalidades ─────────────────────────────────────────────────────
-export function useNacionalidades(params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }) {
+export function useNacionalidades(params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string }) {
   const { accessToken } = useAuth();
   return useQuery({
     queryKey: MOV_KEYS.nacionalidades(params),
@@ -274,7 +273,7 @@ export function useNacionalidades(params: { establecimientoId?: string; fechaDes
 }
 
 // ── Motivos de Viaje ───────────────────────────────────────────────────────
-export function useMotivosViaje(params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string; agrupacion?: string }) {
+export function useMotivosViaje(params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string; agrupacion?: string }) {
   const { accessToken } = useAuth();
   return useQuery({
     queryKey: MOV_KEYS.motivosViaje(params),
@@ -285,7 +284,7 @@ export function useMotivosViaje(params: { establecimientoId?: string; fechaDesde
 }
 
 // ── Tipos de Habitación ────────────────────────────────────────────────────
-export function useTiposHabitacion(params: { establecimientoId?: string; fechaDesde: string; fechaHasta: string }) {
+export function useTiposHabitacion(params: { establecimientoIds?: string[]; fechaDesde: string; fechaHasta: string }) {
   const { accessToken } = useAuth();
   return useQuery({
     queryKey: MOV_KEYS.tiposHabitacion(params),
