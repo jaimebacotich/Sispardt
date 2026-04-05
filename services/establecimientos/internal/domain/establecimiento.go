@@ -18,6 +18,7 @@ type Establecimiento struct {
 	Telefono                 *string    `json:"telefono,omitempty"`
 	Email                    *string    `json:"email,omitempty"`
 	EstadoAdmin              string     `json:"estadoAdmin"`
+	FechaInicioOperaciones   string     `json:"fechaInicioOperaciones"` // YYYY-MM-DD
 	CreadoAt                 time.Time  `json:"creadoAt"`
 	ActualizadoAt            time.Time  `json:"actualizadoAt"`
 	EliminadoAt              *time.Time `json:"eliminadoAt,omitempty"`
@@ -40,6 +41,7 @@ type CreateEstablecimientoRequest struct {
 	Telefono                 *string  `json:"telefono"`
 	Email                    *string  `json:"email"`
 	ServiciosIds             []int    `json:"serviciosIds"`
+	FechaInicioOperaciones   string   `json:"fechaInicioOperaciones"` // YYYY-MM-DD, requerido
 }
 
 type UpdateEstablecimientoRequest struct {
@@ -157,6 +159,7 @@ type EstablecimientoResponse struct {
 	CapacidadHospedaje       int      `json:"capacidadHospedaje"`
 	Activo                   bool     `json:"activo"`
 	CreadoEn                 string   `json:"creadoEn"`
+	FechaInicioOperaciones   string   `json:"fechaInicioOperaciones"`
 }
 
 // HabitacionResponse — DTO camelCase para el frontend.

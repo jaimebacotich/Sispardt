@@ -36,6 +36,20 @@ type LocalidadRecord struct {
 	EsSistema            bool   `json:"es_sistema"`
 }
 
+type EstablecimientoRecord struct {
+	ID                     string  `json:"id"`
+	FechaInicioOperaciones *string `json:"fecha_inicio_operaciones"` // epoch days (Debezium date type) o null
+	EliminadoAt            *int64  `json:"eliminado_at"`
+}
+
+// Debezium codifica columnas tipo `date` como número de días desde la época Unix (1970-01-01).
+// FechaInicioOperacionesDays contiene ese entero cuando el campo llega como número.
+type EstablecimientoRawRecord struct {
+	ID                     string `json:"id"`
+	FechaInicioOperaciones *int32 `json:"fecha_inicio_operaciones"` // días desde 1970-01-01
+	EliminadoAt            *int64 `json:"eliminado_at"`
+}
+
 type HabitacionRecord struct {
 	ID                string  `json:"id"`
 	EstablecimientoID string  `json:"establecimiento_id"`
@@ -85,6 +99,14 @@ func UnmarshalLocalidad(raw json.RawMessage) (*LocalidadRecord, error) {
 		return nil, nil
 	}
 	var r LocalidadRecord
+	return &r, json.Unmarshal(raw, &r)
+}
+
+func UnmarshalEstablecimiento(raw json.RawMessage) (*EstablecimientoRawRecord, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	var r EstablecimientoRawRecord
 	return &r, json.Unmarshal(raw, &r)
 }
 

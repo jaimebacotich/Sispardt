@@ -759,9 +759,9 @@ func (r *ParteDiarioRepo) GetCierrePorFecha(ctx context.Context, establecimiento
 	return &c, nil
 }
 
-func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimientoID, sistemaInicioDate string) ([]domain.FechaPendiente, error) {
-	// Genera todas las fechas desde el inicio del sistema hasta ayer-1 (today-2),
-	// excluyendo las que ya tienen un cierre registrado.
+func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimientoID string) ([]domain.FechaPendiente, error) {
+	// Genera todas las fechas desde la fecha_inicio_operaciones del establecimiento
+	// hasta ayer-1 (today-2), excluyendo las que ya tienen un cierre registrado.
 	// Check-ins: partes cuya fecha_reporte = ese día.
 	// Check-outs: partes cuya salida_at (en hora Bolivia) = ese día (sin importar fecha_reporte).
 	const sql = `
@@ -775,7 +775,12 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 			 WHERE pd.establecimiento_id = $1
 			   AND (pd.salida_at AT TIME ZONE 'America/La_Paz')::date = d.fecha::date
 			   AND pd.estado_operativo = 'ACTIVO') AS total_checkouts
-		FROM generate_series($2::date, CURRENT_DATE - INTERVAL '2 days', INTERVAL '1 day') AS d(fecha)
+		FROM generate_series(
+			(SELECT fecha_inicio_operaciones FROM public.establecimientos_replica_cache
+			 WHERE establecimiento_id = $1),
+			CURRENT_DATE - INTERVAL '2 days',
+			INTERVAL '1 day'
+		) AS d(fecha)
 		WHERE NOT EXISTS (
 			SELECT 1 FROM public.cierres_diarios cd
 			WHERE cd.establecimiento_id = $1 AND cd.fecha_reporte = d.fecha::date
@@ -784,7 +789,7 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 
 	var results []domain.FechaPendiente
 	err := WithRLS(ctx, r.pool, establecimientoID, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, sql, establecimientoID, sistemaInicioDate)
+		rows, err := tx.Query(ctx, sql, establecimientoID)
 		if err != nil {
 			return err
 		}

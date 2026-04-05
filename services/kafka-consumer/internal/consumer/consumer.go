@@ -13,11 +13,17 @@ import (
 	"sispardt/kafka-consumer/internal/repository"
 )
 
+// epochDate convierte días desde 1970-01-01 (formato Debezium para tipo `date`) a string YYYY-MM-DD.
+func epochDate(days int32) string {
+	return time.Unix(0, 0).UTC().AddDate(0, 0, int(days)).Format("2006-01-02")
+}
+
 var managedTopics = []string{
 	"sispardt.public.paises",
 	"sispardt.public.divisiones_principales",
 	"sispardt.public.divisiones_secundarias",
 	"sispardt.public.localidades",
+	"sispardt.public.establecimientos",
 	"sispardt.public.tipo_habitaciones",
 	"sispardt.public.tipo_camas",
 	"sispardt.public.habitaciones",
@@ -25,10 +31,11 @@ var managedTopics = []string{
 }
 
 type Consumer struct {
-	reader    *kafka.Reader
-	repo      *repository.ReplicaRepo
-	tiposHab  map[int]string // id → nombre, cache en memoria
-	tiposCama map[int]int    // id → capacidad_personas, cache en memoria
+	reader           *kafka.Reader
+	repo             *repository.ReplicaRepo
+	tiposHab         map[int]string // id → nombre, cache en memoria
+	tiposCama        map[int]int    // id → capacidad_personas, cache en memoria
+	pendingCapacidad map[string]int // habitacion_id → delta acumulado pendiente
 }
 
 func New(brokers []string, groupID string, repo *repository.ReplicaRepo) *Consumer {
@@ -44,7 +51,7 @@ func New(brokers []string, groupID string, repo *repository.ReplicaRepo) *Consum
 		ReadLagInterval:       -1,
 		WatchPartitionChanges: true,
 	})
-	return &Consumer{reader: r, repo: repo, tiposHab: make(map[int]string), tiposCama: make(map[int]int)}
+	return &Consumer{reader: r, repo: repo, tiposHab: make(map[int]string), tiposCama: make(map[int]int), pendingCapacidad: make(map[string]int)}
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
@@ -109,6 +116,8 @@ func (c *Consumer) handle(ctx context.Context, msg kafka.Message) error {
 		return c.handleDivisionSecundaria(ctx, env.Op, activeRaw)
 	case "sispardt.public.localidades":
 		return c.handleLocalidad(ctx, env.Op, activeRaw)
+	case "sispardt.public.establecimientos":
+		return c.handleEstablecimiento(ctx, env.Op, activeRaw)
 	case "sispardt.public.tipo_habitaciones":
 		return c.handleTipoHabitacion(ctx, env.Op, activeRaw)
 	case "sispardt.public.tipo_camas":
@@ -155,6 +164,19 @@ func (c *Consumer) handleLocalidad(ctx context.Context, op string, raw json.RawM
 		return err
 	}
 	return c.repo.UpsertLocalidad(ctx, rec)
+}
+
+func (c *Consumer) handleEstablecimiento(ctx context.Context, op string, raw json.RawMessage) error {
+	rec, err := models.UnmarshalEstablecimiento(raw)
+	if err != nil || rec == nil {
+		return err
+	}
+	// Eliminados o sin fecha: ignorar (no afecta las fechas pendientes existentes)
+	if op == OpDelete || rec.EliminadoAt != nil || rec.FechaInicioOperaciones == nil {
+		return nil
+	}
+	fecha := epochDate(*rec.FechaInicioOperaciones)
+	return c.repo.UpsertEstablecimientoReplica(ctx, rec.ID, fecha)
 }
 
 func (c *Consumer) handleTipoHabitacion(ctx context.Context, op string, raw json.RawMessage) error {
@@ -209,7 +231,17 @@ func (c *Consumer) handleHabitacion(ctx context.Context, op string, raw json.Raw
 			tipoNombre = nombre
 		}
 	}
-	return c.repo.UpsertHabitacion(ctx, rec, tipoNombre, 0)
+	if err := c.repo.UpsertHabitacion(ctx, rec, tipoNombre, 0); err != nil {
+		return err
+	}
+	// Aplicar delta de capacidad pendiente (race condition: camas llegaron antes que la habitación)
+	if delta, ok := c.pendingCapacidad[rec.ID]; ok && delta > 0 {
+		if err := c.repo.SetCapacidadHabitacion(ctx, rec.ID, delta); err != nil {
+			return err
+		}
+		delete(c.pendingCapacidad, rec.ID)
+	}
+	return nil
 }
 
 func (c *Consumer) handleHabitacionCama(ctx context.Context, op string, before, after json.RawMessage) error {
@@ -274,8 +306,8 @@ func (c *Consumer) handleHabitacionCama(ctx context.Context, op string, before, 
 
 	actual, err := c.repo.GetCapacidadActual(ctx, habitacionID)
 	if err != nil {
-		log.Warn().Err(err).Str("habitacion_id", habitacionID).
-			Msg("habitación no encontrada en cache — ignorando actualización de capacidad")
+		// Habitación aún no en cache (race condition snapshot): acumular delta para aplicar luego
+		c.pendingCapacidad[habitacionID] += delta
 		return nil
 	}
 

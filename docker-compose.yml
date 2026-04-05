@@ -41,7 +41,6 @@ services:
       POSTGRES_DB:       sispardt_establecimientos
       POSTGRES_USER:     ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_EST:?Variable POSTGRES_PASSWORD_EST requerida}
-      LOAD_TEST_DATA:    ${LOAD_TEST_DATA:-false}
       APP_PASS_ADMIN:    ${APP_PASS_ADMIN:?Variable APP_PASS_ADMIN requerida}
       APP_PASS_RESP_REG: ${APP_PASS_RESP_REG:?Variable APP_PASS_RESP_REG requerida}
       APP_PASS_TEC_REG:  ${APP_PASS_TEC_REG:?Variable APP_PASS_TEC_REG requerida}
@@ -78,7 +77,6 @@ services:
       POSTGRES_DB:       sispardt_movimientos
       POSTGRES_USER:     ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_MOV:?Variable POSTGRES_PASSWORD_MOV requerida}
-      LOAD_TEST_DATA:    ${LOAD_TEST_DATA:-false}
       APP_PASS_ADMIN:    ${APP_PASS_ADMIN:?Variable APP_PASS_ADMIN requerida}
       APP_PASS_RESP_REG: ${APP_PASS_RESP_REG:?Variable APP_PASS_RESP_REG requerida}
       APP_PASS_RECEP:    ${APP_PASS_RECEP:?Variable APP_PASS_RECEP requerida}
@@ -319,7 +317,6 @@ services:
       KEYCLOAK_CLIENT_SECRET: "${KC_SECRET_MOV_SVC}"
       LOG_LEVEL:           "debug"
       ENV:                 "${ENV:-development}"
-      SISTEMA_INICIO_DATE: "${SISTEMA_INICIO_DATE:-2026-03-10}"
     networks:
       - sispardt-net
     depends_on:

@@ -208,15 +208,29 @@ export function EstablecimientosList() {
     },
     {
       key: "clasificacion",
-      header: "Clasificación / Categoría",
+      header: (
+        <div className="leading-tight">
+          <div>Clasificación</div>
+          <div className="font-normal normal-case tracking-normal">Categoría</div>
+        </div>
+      ),
       cell: (e) => (
-        <div>
+        <div className="space-y-0.5">
           <div className="text-xs text-muted-foreground">{e.clasificacionNombre}</div>
           <span className="text-xs font-medium bg-chart-4/10 text-chart-4 px-2 py-0.5 rounded-full border border-chart-4/20">
             {e.categoriaNombre}
           </span>
         </div>
       ),
+    },
+    {
+      key: "inicio_reportes",
+      header: "Inicia Reportes",
+      cell: (e) => {
+        if (!e.fechaInicioOperaciones) return <span className="text-muted-foreground italic">—</span>;
+        const [y, m, d] = e.fechaInicioOperaciones.split("-");
+        return <span className="text-xs text-foreground font-mono">{`${d}/${m}/${y}`}</span>;
+      },
     },
     {
       key: "localidad",

@@ -16,7 +16,7 @@
     "publication.name": "pardt_establecimientos_pub",
     "slot.name": "debezium_establecimientos_slot",
 
-    "table.include.list": "public.paises,public.divisiones_principales,public.divisiones_secundarias,public.localidades,public.establecimientos,public.habitaciones,public.habitacion_camas,public.tipo_habitaciones",
+    "table.include.list": "public.paises,public.divisiones_principales,public.divisiones_secundarias,public.localidades,public.establecimientos,public.tipo_camas,public.habitaciones,public.habitacion_camas,public.tipo_habitaciones",
 
     "snapshot.mode": "initial",
 

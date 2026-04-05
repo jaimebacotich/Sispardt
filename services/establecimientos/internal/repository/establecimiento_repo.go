@@ -53,7 +53,7 @@ const estBaseSelect = `
 		e.id, e.nro_licencia, e.razon_social, e.propietario,
 		e.tiene_licencia_vigente, e.fecha_vencimiento_licencia::text,
 		e.direccion, e.latitud, e.longitud, e.telefono, e.email,
-		e.estado_admin, e.creado_at,
+		e.estado_admin, e.creado_at, e.fecha_inicio_operaciones::text,
 		c.id   AS cat_id,   c.nombre AS cat_nombre,
 		cl.id  AS cls_id,   cl.nombre AS cls_nombre,
 		l.id   AS loc_id,   l.nombre  AS loc_nombre,
@@ -90,7 +90,7 @@ func scanEstablecimiento(row pgx.Row) (*domain.EstablecimientoResponse, error) {
 		&e.ID, &e.NroLicencia, &e.RazonSocial, &propietario,
 		&e.TieneLicenciaTuristica, &e.FechaVencimientoLicencia,
 		&e.Direccion, &e.Latitud, &e.Longitud, &e.Telefono, &e.Email,
-		&estadoAdmin, &creadoAt,
+		&estadoAdmin, &creadoAt, &e.FechaInicioOperaciones,
 		&catID, &catNombre,
 		&clsID, &clsNombre,
 		&locID, &locNombre,
@@ -214,7 +214,8 @@ func (r *EstablecimientoRepo) GetByIDRaw(ctx context.Context, id string) (*domai
 		SELECT e.id, e.nro_licencia, e.razon_social, e.propietario,
 		       e.localidad_id, e.categoria_id, e.tiene_licencia_vigente,
 		       e.fecha_vencimiento_licencia::text, e.direccion, e.latitud, e.longitud,
-		       e.telefono, e.email, e.estado_admin, e.creado_at, e.actualizado_at
+		       e.telefono, e.email, e.estado_admin, e.creado_at, e.actualizado_at,
+		       e.fecha_inicio_operaciones::text
 		FROM public.establecimientos e
 		WHERE e.id = $1 AND e.eliminado_at IS NULL`
 
@@ -224,6 +225,7 @@ func (r *EstablecimientoRepo) GetByIDRaw(ctx context.Context, id string) (*domai
 		&e.LocalidadID, &e.CategoriaID, &e.TieneLicenciaVigente,
 		&e.FechaVencimientoLicencia, &e.Direccion, &e.Latitud, &e.Longitud,
 		&e.Telefono, &e.Email, &e.EstadoAdmin, &e.CreadoAt, &e.ActualizadoAt,
+		&e.FechaInicioOperaciones,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -241,8 +243,8 @@ func (r *EstablecimientoRepo) Create(ctx context.Context, tx pgx.Tx, req domain.
 		INSERT INTO public.establecimientos
 			(nro_licencia, razon_social, propietario, localidad_id, categoria_id,
 			 tiene_licencia_vigente, fecha_vencimiento_licencia, direccion,
-			 latitud, longitud, telefono, email)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			 latitud, longitud, telefono, email, fecha_inicio_operaciones)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id`
 
 	var id string
@@ -251,6 +253,7 @@ func (r *EstablecimientoRepo) Create(ctx context.Context, tx pgx.Tx, req domain.
 		req.LocalidadID, req.CategoriaID, req.TieneLicenciaVigente,
 		req.FechaVencimientoLicencia, req.Direccion,
 		req.Latitud, req.Longitud, req.Telefono, req.Email,
+		req.FechaInicioOperaciones,
 	).Scan(&id); err != nil {
 		return nil, fmt.Errorf("crear establecimiento: %w", err)
 	}

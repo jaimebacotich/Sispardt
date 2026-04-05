@@ -69,7 +69,7 @@ func main() {
 		log.Warn().Msg("KEYCLOAK_CLIENT_SECRET no definido: enriquecimiento de auditoría deshabilitado")
 	}
 
-	parteSvc := service.NewParteDiarioService(pool, statsPool, cfg.SistemaInicioDate)
+	parteSvc := service.NewParteDiarioService(pool, statsPool)
 	router := handler.NewRouter(jwtValidator, parteSvc, kcClient)
 
 	srv := &http.Server{

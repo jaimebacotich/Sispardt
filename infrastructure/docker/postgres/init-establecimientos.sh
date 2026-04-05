@@ -36,13 +36,7 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/03-datos-geograficos
 log "--> 04: Catalogos..."
 psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/04-datos-catalogos.sql"
 
-# ---- 6. Datos de prueba (solo entorno dev) ----
-if [ "${LOAD_TEST_DATA:-false}" = "true" ]; then
-    log "--> 05: Datos de prueba (dev)..."
-    psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/05-datos-prueba.sql"
-fi
-
-# ---- 7. Publicacion CDC para Debezium ----
+# ---- 6. Publicacion CDC para Debezium ----
 # Publica las tablas que se replican en la BD Movimientos (replica_cache)
 log "--> Creando publicacion CDC pardt_establecimientos_pub..."
 psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
@@ -54,8 +48,16 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
         public.localidades,
         public.establecimientos,
         public.habitaciones,
-        public.habitacion_camas
+        public.habitacion_camas,
+        public.tipo_camas
     WITH (publish = 'insert, update, delete, truncate');
+
+    CREATE TABLE IF NOT EXISTS public.debezium_heartbeat (
+        id   int PRIMARY KEY,
+        ts   timestamptz NOT NULL DEFAULT NOW()
+    );
+    INSERT INTO public.debezium_heartbeat (id, ts) VALUES (1, NOW())
+    ON CONFLICT (id) DO NOTHING;
 EOSQL
 
 # ---- 8. Usuarios de aplicacion con login ----
@@ -102,6 +104,7 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
     GRANT USAGE ON SCHEMA public TO app_debezium;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_debezium;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO app_debezium;
+    GRANT SELECT, UPDATE ON public.debezium_heartbeat TO app_debezium;
 EOSQL
 
 # Re-establecer contraseña de postgres con scram-sha-256 (el init de Docker

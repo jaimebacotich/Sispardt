@@ -11,9 +11,8 @@ type Config struct {
 	DBDSNStats        string // app_resp_estadistica — sin RLS, solo lectura
 	KeycloakJWKSURL   string
 	KeycloakIssuer    string
-	LogLevel          string
-	Env               string
-	SistemaInicioDate string // primer día que requiere cierre (YYYY-MM-DD)
+	LogLevel string
+	Env      string
 	// Keycloak Admin API (para enriquecimiento de auditoría)
 	KeycloakAdminURL     string
 	KeycloakRealm        string
@@ -30,7 +29,6 @@ func Load() (*Config, error) {
 		KeycloakIssuer:    os.Getenv("KEYCLOAK_ISSUER"),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		Env:               getEnv("ENV", "development"),
-		SistemaInicioDate:    getEnv("SISTEMA_INICIO_DATE", "2026-03-10"),
 		KeycloakAdminURL:     getEnv("KEYCLOAK_ADMIN_URL", "http://keycloak:8080"),
 		KeycloakRealm:        getEnv("KEYCLOAK_REALM", "sispardt"),
 		KeycloakClientID:     getEnv("KEYCLOAK_CLIENT_ID", "sispardt-movimientos-svc"),

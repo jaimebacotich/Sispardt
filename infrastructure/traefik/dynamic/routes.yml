@@ -28,6 +28,13 @@ http:
         - web
       priority: 200
 
+    frontend:
+      rule: "PathPrefix(`/`)"
+      service: svc-frontend
+      entryPoints:
+        - web
+      priority: 1
+
   middlewares:
     sistema-ratelimit:
       rateLimit:
@@ -52,3 +59,8 @@ http:
         healthCheck:
           path: /health
           interval: 15s
+
+    svc-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://svc-frontend:3000"

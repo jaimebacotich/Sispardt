@@ -36,13 +36,11 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/03-datos-catalogos.s
 log "--> 04: Datos replica cache inicial..."
 psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/04-datos-replica.sql"
 
-# ---- 6. Datos de prueba (solo entorno dev) ----
-if [ "${LOAD_TEST_DATA:-false}" = "true" ]; then
-    log "--> 05: Datos de prueba (dev)..."
-    psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/05-datos-prueba.sql"
-fi
+# ---- 5b. Tabla replica establecimientos ----
+log "--> 05: Replica establecimientos..."
+psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" -f "$SCRIPTS/05-add-establecimientos-replica.sql"
 
-# ---- 7. Usuarios de aplicacion con login ----
+# ---- 6. Usuarios de aplicacion con login ----
 # Los roles NOLOGIN ya fueron creados en 02-roles.sql.
 log "--> Creando usuarios de aplicacion..."
 psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
@@ -96,7 +94,8 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
         public.divisiones_principales_replica_cache,
         public.divisiones_secundarias_replica_cache,
         public.localidades_replica_cache,
-        public.habitaciones_replica_cache
+        public.habitaciones_replica_cache,
+        public.establecimientos_replica_cache
     TO app_kafka_consumer;
 
     -- Debezium necesita SELECT en tablas publicadas
@@ -110,6 +109,7 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
     ALTER TABLE public.divisiones_secundarias_replica_cache DISABLE ROW LEVEL SECURITY;
     ALTER TABLE public.localidades_replica_cache DISABLE ROW LEVEL SECURITY;
     ALTER TABLE public.habitaciones_replica_cache DISABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.establecimientos_replica_cache DISABLE ROW LEVEL SECURITY;
 EOSQL
 
 # Re-establecer contraseña de postgres con scram-sha-256

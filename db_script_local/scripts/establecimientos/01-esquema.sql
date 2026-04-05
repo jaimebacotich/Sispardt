@@ -269,6 +269,7 @@ CREATE TABLE public.establecimientos (
     telefono character varying(50),
     email character varying(100),
     estado_admin character varying(20) DEFAULT 'ACTIVO',
+    fecha_inicio_operaciones date NOT NULL DEFAULT CURRENT_DATE,
     creado_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     actualizado_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     eliminado_at timestamp with time zone

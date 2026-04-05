@@ -67,6 +67,7 @@ export interface Establecimiento {
   capacidadHospedaje: number;
   activo: boolean;
   creadoEn: string;
+  fechaInicioOperaciones: string; // YYYY-MM-DD
 }
 
 export interface EstablecimientoCreate {
@@ -85,6 +86,7 @@ export interface EstablecimientoCreate {
   latitud?: number;
   longitud?: number;
   serviciosIds?: string[];
+  fechaInicioOperaciones: string; // YYYY-MM-DD, requerido
 }
 
 export interface Habitacion {

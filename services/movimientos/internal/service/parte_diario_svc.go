@@ -13,20 +13,18 @@ import (
 )
 
 type ParteDiarioService struct {
-	repo              *repository.ParteDiarioRepo
-	auditRepo         *repository.AuditoriaRepo
-	pool              *pgxpool.Pool
-	statsPool         *pgxpool.Pool
-	sistemaInicioDate string
+	repo      *repository.ParteDiarioRepo
+	auditRepo *repository.AuditoriaRepo
+	pool      *pgxpool.Pool
+	statsPool *pgxpool.Pool
 }
 
-func NewParteDiarioService(pool, statsPool *pgxpool.Pool, sistemaInicioDate string) *ParteDiarioService {
+func NewParteDiarioService(pool, statsPool *pgxpool.Pool) *ParteDiarioService {
 	return &ParteDiarioService{
-		repo:              repository.NewParteDiarioRepo(pool, statsPool),
-		auditRepo:         repository.NewAuditoriaRepo(statsPool),
-		pool:              pool,
-		statsPool:         statsPool,
-		sistemaInicioDate: sistemaInicioDate,
+		repo:      repository.NewParteDiarioRepo(pool, statsPool),
+		auditRepo: repository.NewAuditoriaRepo(statsPool),
+		pool:      pool,
+		statsPool: statsPool,
 	}
 }
 
@@ -175,7 +173,7 @@ func (s *ParteDiarioService) GetCierrePorFecha(ctx context.Context, establecimie
 }
 
 func (s *ParteDiarioService) GetFechasPendientes(ctx context.Context, establecimientoID string) ([]domain.FechaPendiente, error) {
-	return s.repo.GetFechasPendientes(ctx, establecimientoID, s.sistemaInicioDate)
+	return s.repo.GetFechasPendientes(ctx, establecimientoID)
 }
 
 func (s *ParteDiarioService) CreateCierre(ctx context.Context, userID, cerradoPor, username, firstName, lastName, clientIP, establecimientoID string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiarioResponse, error) {

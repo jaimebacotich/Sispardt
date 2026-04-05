@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   Building2,
+  Calendar,
   MapPin,
   Phone,
   Star,
@@ -69,6 +70,9 @@ const schema = z
     direccion: z.string().min(5, "Mínimo 5 caracteres"),
     latitud: z.number().nullable(),
     longitud: z.number().nullable(),
+
+    // Operaciones
+    fechaInicioOperaciones: z.string().min(1, "La fecha de inicio es requerida"),
 
     // Estado (solo edición)
     activo: z.boolean(),
@@ -175,6 +179,7 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
       direccion: "",
       latitud: null,
       longitud: null,
+      fechaInicioOperaciones: today,
       activo: true,
       ...defaultValues,
     },
@@ -244,6 +249,7 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
         telefono: data.telefono || undefined,
         email: data.email || undefined,
         fechaVencimientoLicencia: data.fechaVencimientoLicencia || undefined,
+        fechaInicioOperaciones: data.fechaInicioOperaciones,
         // Convertir strings a ids reales
         serviciosIds: serviciosSeleccionados,
       };
@@ -307,6 +313,33 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
                   value={field.value as string}
                   placeholder="Juan Pérez García"
                 />
+              )}
+            />
+          </Section>
+
+          {/* ── Inicio de Operaciones ──────────────────────────────────── */}
+          <Section icon={Calendar} title="Inicio de Operaciones">
+            <FormField
+              control={control}
+              name="fechaInicioOperaciones"
+              label="Fecha de Inicio de Operaciones"
+              required
+              render={({ field, fieldState }) => (
+                <div className="max-w-xs">
+                  <Input
+                    {...field}
+                    value={field.value as string}
+                    type="date"
+                    max={today}
+                    className={cn(fieldState.error && "border-destructive")}
+                  />
+                  {fieldState.error && (
+                    <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Desde esta fecha se calcularán los partes diarios pendientes de cierre.
+                  </p>
+                </div>
               )}
             />
           </Section>
@@ -667,6 +700,7 @@ function EstablecimientoEditLoader({ id }: { id: string }) {
         direccion: est.direccion,
         latitud: est.latitud,
         longitud: est.longitud,
+        fechaInicioOperaciones: est.fechaInicioOperaciones ?? new Date().toISOString().split("T")[0],
         activo: est.activo,
         serviciosIds: est.serviciosIds,
       } as FormData & { serviciosIds: string[] }}

@@ -349,7 +349,6 @@ jobs:
             --from-literal=KEYCLOAK_REALM=sispardt \
             --from-literal=KEYCLOAK_CLIENT_ID_EST=sispardt-establecimientos-svc \
             --from-literal=KEYCLOAK_CLIENT_ID_MOV=sispardt-movimientos-svc \
-            --from-literal=SISTEMA_INICIO_DATE=2026-03-10 \
             --from-literal=API_ESTABLECIMIENTOS_URL=http://svc-establecimientos.sispardt.svc.cluster.local:8081 \
             --from-literal=API_MOVIMIENTOS_URL=http://svc-movimientos.sispardt.svc.cluster.local:8082 \
             --from-literal=NEXTAUTH_URL=http://${NODE_IP} \

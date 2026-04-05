@@ -139,6 +139,19 @@ func (r *ReplicaRepo) GetCapacidadActual(ctx context.Context, habitacionID strin
 	return cap, wrapErr("get capacidad actual", err)
 }
 
+// UpsertEstablecimientoReplica guarda la fecha de inicio de operaciones del establecimiento.
+// fechaInicioOperaciones en formato YYYY-MM-DD.
+func (r *ReplicaRepo) UpsertEstablecimientoReplica(ctx context.Context, establecimientoID, fechaInicioOperaciones string) error {
+	const sql = `
+		INSERT INTO public.establecimientos_replica_cache (establecimiento_id, fecha_inicio_operaciones, actualizado_at)
+		VALUES ($1, $2::date, NOW())
+		ON CONFLICT (establecimiento_id) DO UPDATE SET
+			fecha_inicio_operaciones = EXCLUDED.fecha_inicio_operaciones,
+			actualizado_at           = NOW()`
+	_, err := r.pool.Exec(ctx, sql, establecimientoID, fechaInicioOperaciones)
+	return wrapErr("upsert establecimiento_replica", err)
+}
+
 func wrapErr(op string, err error) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
