@@ -759,9 +759,14 @@ func (r *ParteDiarioRepo) GetCierrePorFecha(ctx context.Context, establecimiento
 	return &c, nil
 }
 
+// ErrFechaInicioNoDisponible se retorna cuando el establecimiento no tiene
+// fecha_inicio_operaciones registrada en la caché de réplica (CDC aún no propagado
+// o el campo es NULL en la BD origen).
+var ErrFechaInicioNoDisponible = errors.New("FECHA_INICIO_NO_DISPONIBLE")
+
 func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimientoID string) ([]domain.FechaPendiente, error) {
 	// Genera todas las fechas desde la fecha_inicio_operaciones del establecimiento
-	// hasta ayer-1 (today-2), excluyendo las que ya tienen un cierre registrado.
+	// hasta CURRENT_DATE-2 (fuera de plazo), excluyendo las que ya tienen cierre.
 	// Check-ins: partes cuya fecha_reporte = ese día.
 	// Check-outs: partes cuya salida_at (en hora Bolivia) = ese día (sin importar fecha_reporte).
 	const sql = `
@@ -789,6 +794,20 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 
 	var results []domain.FechaPendiente
 	err := WithRLS(ctx, r.pool, establecimientoID, func(tx pgx.Tx) error {
+		// Pre-check: si el establecimiento no está en la réplica (CDC no propagado
+		// o fecha_inicio_operaciones es NULL), retornar error explícito en lugar
+		// de lista vacía que simularía "todo al día".
+		var tieneCache bool
+		if err := tx.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM public.establecimientos_replica_cache WHERE establecimiento_id = $1)`,
+			establecimientoID,
+		).Scan(&tieneCache); err != nil {
+			return err
+		}
+		if !tieneCache {
+			return ErrFechaInicioNoDisponible
+		}
+
 		rows, err := tx.Query(ctx, sql, establecimientoID)
 		if err != nil {
 			return err
@@ -806,6 +825,9 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 	})
 
 	if err != nil {
+		if errors.Is(err, ErrFechaInicioNoDisponible) {
+			return nil, ErrFechaInicioNoDisponible
+		}
 		return nil, fmt.Errorf("fechas pendientes: %w", err)
 	}
 	if results == nil {

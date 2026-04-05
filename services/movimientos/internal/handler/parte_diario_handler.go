@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"sispardt/movimientos/internal/auth"
 	"sispardt/movimientos/internal/domain"
+	"sispardt/movimientos/internal/repository"
 	"sispardt/movimientos/internal/service"
 )
 
@@ -221,6 +223,10 @@ func (h *CierreDiarioHandler) Pendientes(w http.ResponseWriter, r *http.Request)
 	}
 	result, err := h.svc.GetFechasPendientes(r.Context(), estID)
 	if err != nil {
+		if errors.Is(err, repository.ErrFechaInicioNoDisponible) {
+			jsonError(w, http.StatusUnprocessableEntity, "FECHA_INICIO_NO_DISPONIBLE")
+			return
+		}
 		jsonError(w, http.StatusInternalServerError, "error al obtener fechas pendientes")
 		return
 	}

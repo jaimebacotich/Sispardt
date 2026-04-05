@@ -84,7 +84,9 @@ psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d "$DB" <<-EOSQL
         public.divisiones_principales_replica_cache,
         public.divisiones_secundarias_replica_cache,
         public.localidades_replica_cache,
-        public.habitaciones_replica_cache
+        public.habitaciones_replica_cache,
+        public.establecimientos_replica_cache,
+        public.cierres_diarios
     TO app_recepcionista;
 
     -- Kafka consumer: actualiza las tablas de replica_cache

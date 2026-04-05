@@ -6,8 +6,9 @@ import { CierrePanel } from "@/components/recepcionista/cierre-panel";
 import { CierreHistorial } from "@/components/recepcionista/cierre-historial";
 import { useFechasPendientes } from "@/hooks/useMovimientos";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { AlertTriangle, CheckCircle2, ChevronRight, LogIn, LogOut } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock, LogIn, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/api-client";
 import type { FechaPendiente } from "@/types/api";
 
 /* ────────────────────────────────────────────────────────────
@@ -84,7 +85,11 @@ function FechaPendienteRow({
 
 export default function CierreFueraDePlazoPage() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null);
-  const { data: pendientes = [], isLoading } = useFechasPendientes();
+  const { data: pendientes = [], isLoading, error } = useFechasPendientes();
+
+  const sinFechaInicio =
+    error instanceof ApiError && error.status === 422 &&
+    (error.body as Record<string, unknown>)?.error === "FECHA_INICIO_NO_DISPONIBLE";
 
   function handleCierreDone() {
     // La query se invalida automáticamente, el item desaparece de la lista
@@ -101,6 +106,19 @@ export default function CierreFueraDePlazoPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <LoadingSpinner size="md" />
+        </div>
+      ) : sinFechaInicio ? (
+        /* ── Fecha de inicio no configurada en réplica ── */
+        <div className="bg-card rounded-xl border border-border p-10 text-center max-w-md">
+          <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center mx-auto mb-4">
+            <Clock size={28} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <p className="text-base font-semibold text-foreground">
+            Fecha de inicio no disponible
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            La fecha de inicio de operaciones aún no fue sincronizada. Intente nuevamente en unos momentos.
+          </p>
         </div>
       ) : pendientes.length === 0 ? (
         /* ── Sin pendientes ── */
