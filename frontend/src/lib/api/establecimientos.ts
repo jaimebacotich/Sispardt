@@ -58,6 +58,13 @@ export const establecimientosApi = {
       token
     ),
 
+  updateHabitacionEstado: (token: string, estId: string, habId: string, estado: "DISPONIBLE" | "MANTENIMIENTO") =>
+    apiClient.patch<{ status: string }>(
+      `/api/v1/establecimientos/${estId}/habitaciones/${habId}/estado`,
+      { estado },
+      token
+    ),
+
   listCategorias: (token: string) =>
     apiClient.get<Categoria[]>("/api/v1/catalogos/categorias", token),
 

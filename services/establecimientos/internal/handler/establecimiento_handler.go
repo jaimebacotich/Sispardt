@@ -130,6 +130,25 @@ func (h *EstablecimientoHandler) CreateHabitacion(w http.ResponseWriter, r *http
 	jsonCreated(w, result)
 }
 
+// UpdateHabitacionEstado PATCH /api/v1/establecimientos/{id}/habitaciones/{habId}/estado
+func (h *EstablecimientoHandler) UpdateHabitacionEstado(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	establecimientoID := chi.URLParam(r, "id")
+	habitacionID := chi.URLParam(r, "habId")
+
+	var req domain.UpdateHabitacionEstadoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
+		return
+	}
+
+	if err := h.svc.UpdateHabitacionEstado(r.Context(), establecimientoID, habitacionID, claims.Sub, r.RemoteAddr, req); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
 // UpdateHabitacion PUT /api/v1/establecimientos/{id}/habitaciones/{habId}
 func (h *EstablecimientoHandler) UpdateHabitacion(w http.ResponseWriter, r *http.Request) {
 	claims := auth.FromContext(r.Context())

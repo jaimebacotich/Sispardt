@@ -87,22 +87,38 @@ func (r *ReplicaRepo) UpsertLocalidad(ctx context.Context, rec *models.Localidad
 func (r *ReplicaRepo) UpsertHabitacion(ctx context.Context, rec *models.HabitacionRecord, tipoNombre string, capacidad int) error {
 	const sql = `
 		INSERT INTO public.habitaciones_replica_cache
-			(habitacion_id, establecimiento_id, nro_habitacion, tipo_habitacion,
+			(habitacion_id, establecimiento_id, nro_habitacion, tipo_habitacion_id, tipo_habitacion,
 			 capacidad_calculada, estado_actual, piso, eliminado_at, actualizado_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 		ON CONFLICT (habitacion_id) DO UPDATE SET
 			establecimiento_id  = EXCLUDED.establecimiento_id,
 			nro_habitacion      = EXCLUDED.nro_habitacion,
-			tipo_habitacion     = EXCLUDED.tipo_habitacion,
+			tipo_habitacion_id  = EXCLUDED.tipo_habitacion_id,
+			tipo_habitacion     = CASE
+				WHEN EXCLUDED.tipo_habitacion != 'desconocido'
+				THEN EXCLUDED.tipo_habitacion
+				ELSE habitaciones_replica_cache.tipo_habitacion
+			END,
 			estado_actual       = EXCLUDED.estado_actual,
 			piso                = EXCLUDED.piso,
 			eliminado_at        = EXCLUDED.eliminado_at,
 			actualizado_at      = NOW()`
 	_, err := r.pool.Exec(ctx, sql,
-		rec.ID, rec.EstablecimientoID, rec.NroHabitacion, tipoNombre,
+		rec.ID, rec.EstablecimientoID, rec.NroHabitacion, rec.TipoHabitacionID, tipoNombre,
 		capacidad, rec.EstadoHab, rec.Piso, microsToTime(rec.EliminadoAt),
 	)
 	return wrapErr("upsert habitacion", err)
+}
+
+// BackfillTipoHabitacion actualiza tipo_habitacion en todas las habitaciones que
+// tienen ese tipo_id pero aún muestran "desconocido" (race condition de startup).
+func (r *ReplicaRepo) BackfillTipoHabitacion(ctx context.Context, tipoID int, nombre string) error {
+	const sql = `
+		UPDATE public.habitaciones_replica_cache
+		SET tipo_habitacion = $2, actualizado_at = NOW()
+		WHERE tipo_habitacion_id = $1`
+	_, err := r.pool.Exec(ctx, sql, tipoID, nombre)
+	return wrapErr("backfill tipo habitacion", err)
 }
 
 func (r *ReplicaRepo) SetCapacidadHabitacion(ctx context.Context, habitacionID string, nuevaCapacidad int) error {

@@ -2,10 +2,11 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { movimientosApi } from "@/lib/api/movimientos";
+import { establecimientosApi } from "@/lib/api/establecimientos";
 import { mockStore } from "@/lib/mocks";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
-import type { ParteDiarioCreate, CierreDiario } from "@/types/api";
+import type { ParteDiarioCreate, CierreDiario, HabitacionEstado } from "@/types/api";
 
 const USE_MOCK = process.env.NEXT_PUBLIC_MOCK_API === "true";
 
@@ -223,6 +224,48 @@ export function useHabitacionesEstado() {
         : movimientosApi.listHabitacionesEstado(accessToken!),
     enabled: USE_MOCK || !!accessToken,
     refetchInterval: USE_MOCK ? false : 30 * 1000,
+  });
+}
+
+// ── Cambiar estado de habitación (mantenimiento / disponible) ───────────────
+export function useUpdateHabitacionEstado() {
+  const { accessToken, establecimientoId } = useAuth();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ habId, estado }: { habId: string; estado: "DISPONIBLE" | "MANTENIMIENTO" }) => {
+      if (USE_MOCK) {
+        const estadoFrontend: HabitacionEstado["estado"] = estado === "MANTENIMIENTO" ? "mantenimiento" : "libre";
+        qc.setQueryData<HabitacionEstado[]>(MOV_KEYS.habitacionesEstado, (prev = []) =>
+          prev.map((h) => (h.id === habId ? { ...h, estado: estadoFrontend } : h))
+        );
+        return;
+      }
+      if (!accessToken || !establecimientoId) throw new Error("Sin autenticación");
+      return establecimientosApi.updateHabitacionEstado(accessToken, establecimientoId, habId, estado);
+    },
+    onMutate: async ({ habId, estado }) => {
+      // Actualización optimista: cambia el estado en cache inmediatamente
+      await qc.cancelQueries({ queryKey: MOV_KEYS.habitacionesEstado });
+      const prevData = qc.getQueryData<HabitacionEstado[]>(MOV_KEYS.habitacionesEstado);
+      const estadoFrontend: HabitacionEstado["estado"] = estado === "MANTENIMIENTO" ? "mantenimiento" : "libre";
+      qc.setQueryData<HabitacionEstado[]>(MOV_KEYS.habitacionesEstado, (prev = []) =>
+        prev.map((h) => (h.id === habId ? { ...h, estado: estadoFrontend } : h))
+      );
+      return { prevData };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prevData) {
+        qc.setQueryData(MOV_KEYS.habitacionesEstado, context.prevData);
+      }
+      toast.error("Error al cambiar el estado de la habitación");
+    },
+    onSuccess: (_data, { estado }) => {
+      const msg = estado === "MANTENIMIENTO" ? "Habitación en mantenimiento" : "Habitación disponible";
+      toast.success(msg);
+      // Refetch después de ~10s para dar tiempo a la propagación Kafka → réplica
+      setTimeout(() => qc.invalidateQueries({ queryKey: MOV_KEYS.habitacionesEstado }), 10000);
+    },
   });
 }
 

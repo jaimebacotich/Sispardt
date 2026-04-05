@@ -110,7 +110,7 @@ func (c *Consumer) handle(ctx context.Context, msg kafka.Message) error {
 	case "sispardt.public.localidades":
 		return c.handleLocalidad(ctx, env.Op, activeRaw)
 	case "sispardt.public.tipo_habitaciones":
-		return c.handleTipoHabitacion(env.Op, activeRaw)
+		return c.handleTipoHabitacion(ctx, env.Op, activeRaw)
 	case "sispardt.public.tipo_camas":
 		return c.handleTipoCama(env.Op, activeRaw)
 	case "sispardt.public.habitaciones":
@@ -157,7 +157,7 @@ func (c *Consumer) handleLocalidad(ctx context.Context, op string, raw json.RawM
 	return c.repo.UpsertLocalidad(ctx, rec)
 }
 
-func (c *Consumer) handleTipoHabitacion(op string, raw json.RawMessage) error {
+func (c *Consumer) handleTipoHabitacion(ctx context.Context, op string, raw json.RawMessage) error {
 	var rec struct {
 		ID          int    `json:"id"`
 		Nombre      string `json:"nombre"`
@@ -170,6 +170,10 @@ func (c *Consumer) handleTipoHabitacion(op string, raw json.RawMessage) error {
 		delete(c.tiposHab, rec.ID)
 	} else {
 		c.tiposHab[rec.ID] = rec.Nombre
+		// Backfillear habitaciones que llegaron antes que este evento de tipo
+		if err := c.repo.BackfillTipoHabitacion(ctx, rec.ID, rec.Nombre); err != nil {
+			log.Warn().Err(err).Int("tipo_id", rec.ID).Msg("backfill tipo_habitacion falló (no crítico)")
+		}
 	}
 	return nil
 }

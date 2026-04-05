@@ -123,6 +123,15 @@ func (s *EstablecimientoService) CreateHabitacion(ctx context.Context, estableci
 	return result, nil
 }
 
+func (s *EstablecimientoService) UpdateHabitacionEstado(ctx context.Context, establecimientoID, habitacionID, userID, clientIP string, req domain.UpdateHabitacionEstadoRequest) error {
+	if req.Estado != "DISPONIBLE" && req.Estado != "MANTENIMIENTO" {
+		return fmt.Errorf("estado inválido: debe ser DISPONIBLE o MANTENIMIENTO")
+	}
+	return repository.WithAuditTx(ctx, s.pool, userID, clientIP, func(tx pgx.Tx) error {
+		return s.repo.UpdateHabitacionEstado(ctx, tx, establecimientoID, habitacionID, req.Estado)
+	})
+}
+
 func (s *EstablecimientoService) UpdateHabitacion(ctx context.Context, establecimientoID, habitacionID, userID, clientIP string, req domain.UpdateHabitacionRequest) (*domain.HabitacionResponse, error) {
 	if req.NroHabitacion == "" {
 		return nil, fmt.Errorf("nro_habitacion es requerido")

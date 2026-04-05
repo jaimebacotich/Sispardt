@@ -46,7 +46,7 @@ const config: Config = {
         status: {
           libre: "#10B981",
           ocupada: "#EF4444",
-          mantenimiento: "#94A3B8",
+          mantenimiento: "#F97316",
           pendiente: "#F59E0B",
         },
         action: {

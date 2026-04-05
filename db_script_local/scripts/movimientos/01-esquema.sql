@@ -245,6 +245,7 @@ CREATE TABLE public.habitaciones_replica_cache (
     habitacion_id uuid NOT NULL PRIMARY KEY,
     establecimiento_id uuid NOT NULL,
     nro_habitacion character varying(20) NOT NULL,
+    tipo_habitacion_id integer,
     tipo_habitacion character varying(50) NOT NULL,
     capacidad_calculada integer NOT NULL,
     estado_actual character varying(20) NOT NULL,

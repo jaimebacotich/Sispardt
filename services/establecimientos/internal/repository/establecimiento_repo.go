@@ -456,6 +456,20 @@ func (r *EstablecimientoRepo) CreateHabitacion(ctx context.Context, tx pgx.Tx, e
 	return &h, nil
 }
 
+func (r *EstablecimientoRepo) UpdateHabitacionEstado(ctx context.Context, tx pgx.Tx, establecimientoID, habitacionID, estado string) error {
+	tag, err := tx.Exec(ctx,
+		`UPDATE public.habitaciones SET estado_hab = $1 WHERE id = $2 AND establecimiento_id = $3`,
+		estado, habitacionID, establecimientoID,
+	)
+	if err != nil {
+		return fmt.Errorf("actualizar estado habitacion: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("habitacion no encontrada")
+	}
+	return nil
+}
+
 func (r *EstablecimientoRepo) UpdateHabitacion(ctx context.Context, tx pgx.Tx, establecimientoID, habitacionID string, req domain.UpdateHabitacionRequest) (*domain.HabitacionResponse, error) {
 	_, err := tx.Exec(ctx,
 		`UPDATE public.habitaciones

@@ -128,6 +128,12 @@ func NewRouter(
 				r.Put("/{id}/habitaciones/{habId}", estHandler.UpdateHabitacion)
 			})
 
+			r.With(auth.RequireRole(
+				auth.RoleRecepcionista,
+				auth.RoleResponsableRegistro,
+				auth.RoleTecnicoRegistro,
+			)).Patch("/{id}/habitaciones/{habId}/estado", estHandler.UpdateHabitacionEstado)
+
 			// -- Personal --
 			r.Get("/{id}/personal", estHandler.ListPersonal)
 

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { BedDouble, User } from "lucide-react";
-import { useHabitacionesEstado } from "@/hooks/useMovimientos";
+import { BedDouble, User, Wrench, CheckCircle } from "lucide-react";
+import { useHabitacionesEstado, useUpdateHabitacionEstado } from "@/hooks/useMovimientos";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmModal } from "@/components/shared";
 import Link from "next/link";
 
 const ESTADO_CONFIG = {
@@ -22,15 +23,17 @@ const ESTADO_CONFIG = {
   },
   mantenimiento: {
     label: "Mantenimiento",
-    cardClass: "bg-muted/50 border-border opacity-75",
-    headerClass: "bg-muted text-muted-foreground",
+    cardClass: "bg-status-mantenimiento/10 border-status-mantenimiento/30 hover:bg-status-mantenimiento/20 cursor-pointer",
+    headerClass: "bg-status-mantenimiento/20 text-status-mantenimiento",
     dot: "bg-status-mantenimiento",
   },
 };
 
 export function HabitacionesGrid() {
   const [pisoFiltro, setPisoFiltro] = useState<string | null>(null);
+  const [pendingEstado, setPendingEstado] = useState<{ habId: string; numero: string; estado: "DISPONIBLE" | "MANTENIMIENTO" } | null>(null);
   const { data: habitaciones = [], isLoading } = useHabitacionesEstado();
+  const { mutate: updateEstado, isPending: isUpdating } = useUpdateHabitacionEstado();
 
   const pisos = Array.from(new Set(habitaciones.map((h) => h.piso))).sort();
   const filtradas = pisoFiltro
@@ -38,8 +41,8 @@ export function HabitacionesGrid() {
     : habitaciones;
 
   const stats = {
-    libres: habitaciones.filter((h) => h.estado === "libre").length,
-    ocupadas: habitaciones.filter((h) => h.estado === "ocupada").length,
+    libres: habitaciones.filter((h) => h.estado === "libre" && h.ocupacionActual === 0).length,
+    ocupadas: habitaciones.filter((h) => h.estado === "ocupada" || h.ocupacionActual > 0).length,
     mantenimiento: habitaciones.filter((h) => h.estado === "mantenimiento").length,
   };
 
@@ -112,13 +115,14 @@ export function HabitacionesGrid() {
         {filtradas.map((hab) => {
           const cfg = ESTADO_CONFIG[hab.estado];
           const isLibre = hab.estado === "libre";
+          const isMantenimiento = hab.estado === "mantenimiento";
           return (
             <div
               key={hab.id}
               className={cn(
                 "rounded-xl border overflow-hidden transition-all duration-150",
                 cfg.cardClass,
-                isLibre && "group"
+                (isLibre || isMantenimiento) && "group"
               )}
             >
               {/* Header */}
@@ -157,11 +161,55 @@ export function HabitacionesGrid() {
                     Check-in
                   </Link>
                 )}
+
+                {/* Botón mantenimiento / disponible */}
+                {hab.estado !== "ocupada" && hab.ocupacionActual === 0 && (
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() => setPendingEstado({
+                      habId: hab.id,
+                      numero: hab.numero,
+                      estado: hab.estado === "mantenimiento" ? "DISPONIBLE" : "MANTENIMIENTO",
+                    })}
+                    className={cn(
+                      "mt-2 w-full text-xs text-center flex items-center justify-center gap-1 py-1 rounded-md font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed",
+                      hab.estado === "mantenimiento"
+                        ? "bg-status-libre/20 text-status-libre hover:bg-status-libre/30"
+                        : "bg-status-mantenimiento/80 text-white hover:bg-status-mantenimiento opacity-0 group-hover:opacity-100"
+                    )}
+                  >
+                    {hab.estado === "mantenimiento" ? (
+                      <><CheckCircle size={11} /> Marcar disponible</>
+                    ) : (
+                      <><Wrench size={11} /> Mantenimiento</>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      <ConfirmModal
+        open={!!pendingEstado}
+        onClose={() => setPendingEstado(null)}
+        onConfirm={() => {
+          if (!pendingEstado) return;
+          updateEstado({ habId: pendingEstado.habId, estado: pendingEstado.estado });
+          setPendingEstado(null);
+        }}
+        title={pendingEstado?.estado === "MANTENIMIENTO" ? "Poner en mantenimiento" : "Marcar como disponible"}
+        description={
+          pendingEstado?.estado === "MANTENIMIENTO"
+            ? `¿Confirmas que la Hab. ${pendingEstado?.numero} entrará en mantenimiento? No se podrán realizar check-ins hasta que sea habilitada nuevamente.`
+            : `¿Confirmas que la Hab. ${pendingEstado?.numero} vuelve a estar disponible?`
+        }
+        confirmLabel={pendingEstado?.estado === "MANTENIMIENTO" ? "Poner en mantenimiento" : "Marcar disponible"}
+        variant={pendingEstado?.estado === "MANTENIMIENTO" ? "destructive" : "default"}
+        isLoading={isUpdating}
+      />
     </div>
   );
 }
