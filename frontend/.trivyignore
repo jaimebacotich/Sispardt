@@ -27,3 +27,19 @@
 # Revisado por: @jaimebacotich — 2026-03-15
 # Condición para levantar: Al migrar a Next.js 15.x
 GHSA-h25m-26qc-wcjf
+
+# CVE-2026-33671 — picomatch: ReDoS via extglob patterns
+# Severidad: HIGH
+# Bibliotecas afectadas:
+#   picomatch@2.3.1 (tailwindcss → chokidar/micromatch) — solo en build/devDependencies
+#   picomatch@4.0.3 (eslint-config-next → tinyglobby) — solo en devDependencies
+#   picomatch@4.0.3 (@dotenvx/dotenvx via shadcn CLI) — herramienta CLI de scaffolding, no runtime del servidor
+# Justificación:
+#   Todas las instancias afectadas son dependencias de herramientas de build o de la
+#   CLI shadcn (generación de componentes). Ninguna procesa input externo de usuarios
+#   en tiempo de ejecución. El vector de ataque requiere patrones extglob controlados
+#   por el atacante, escenario imposible en estos contextos.
+# Revisado por: @jaimebacotich — 2026-04-05
+# Condición para levantar: Al actualizar tailwindcss, eslint-config-next y
+#   @dotenvx/dotenvx a versiones con picomatch≥2.3.2 / ≥4.0.4
+CVE-2026-33671
