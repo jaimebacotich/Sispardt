@@ -19,14 +19,16 @@ var managedTopics = []string{
 	"sispardt.public.divisiones_secundarias",
 	"sispardt.public.localidades",
 	"sispardt.public.tipo_habitaciones",
+	"sispardt.public.tipo_camas",
 	"sispardt.public.habitaciones",
 	"sispardt.public.habitacion_camas",
 }
 
 type Consumer struct {
-	reader        *kafka.Reader
-	repo          *repository.ReplicaRepo
-	tiposHab      map[int]string // id → nombre, cache en memoria
+	reader    *kafka.Reader
+	repo      *repository.ReplicaRepo
+	tiposHab  map[int]string // id → nombre, cache en memoria
+	tiposCama map[int]int    // id → capacidad_personas, cache en memoria
 }
 
 func New(brokers []string, groupID string, repo *repository.ReplicaRepo) *Consumer {
@@ -42,7 +44,7 @@ func New(brokers []string, groupID string, repo *repository.ReplicaRepo) *Consum
 		ReadLagInterval:       -1,
 		WatchPartitionChanges: true,
 	})
-	return &Consumer{reader: r, repo: repo, tiposHab: make(map[int]string)}
+	return &Consumer{reader: r, repo: repo, tiposHab: make(map[int]string), tiposCama: make(map[int]int)}
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
@@ -109,6 +111,8 @@ func (c *Consumer) handle(ctx context.Context, msg kafka.Message) error {
 		return c.handleLocalidad(ctx, env.Op, activeRaw)
 	case "sispardt.public.tipo_habitaciones":
 		return c.handleTipoHabitacion(env.Op, activeRaw)
+	case "sispardt.public.tipo_camas":
+		return c.handleTipoCama(env.Op, activeRaw)
 	case "sispardt.public.habitaciones":
 		return c.handleHabitacion(ctx, env.Op, activeRaw)
 	case "sispardt.public.habitacion_camas":
@@ -170,6 +174,23 @@ func (c *Consumer) handleTipoHabitacion(op string, raw json.RawMessage) error {
 	return nil
 }
 
+func (c *Consumer) handleTipoCama(op string, raw json.RawMessage) error {
+	var rec struct {
+		ID                int    `json:"id"`
+		CapacidadPersonas int    `json:"capacidad_personas"`
+		EliminadoAt       *int64 `json:"eliminado_at"`
+	}
+	if err := json.Unmarshal(raw, &rec); err != nil {
+		return err
+	}
+	if op == OpDelete || rec.EliminadoAt != nil {
+		delete(c.tiposCama, rec.ID)
+	} else {
+		c.tiposCama[rec.ID] = rec.CapacidadPersonas
+	}
+	return nil
+}
+
 func (c *Consumer) handleHabitacion(ctx context.Context, op string, raw json.RawMessage) error {
 	rec, err := models.UnmarshalHabitacion(raw)
 	if err != nil || rec == nil {
@@ -207,27 +228,39 @@ func (c *Consumer) handleHabitacionCama(ctx context.Context, op string, before, 
 	var habitacionID string
 	var delta int
 
+	// capacidadPorCama devuelve capacidad_personas del tipo, o 1 si no está en cache
+	capacidadPorCama := func(tipoCamaID int) int {
+		if cap, ok := c.tiposCama[tipoCamaID]; ok && cap > 0 {
+			return cap
+		}
+		return 1
+	}
+
 	switch op {
 	case OpCreate, OpRead:
 		if afterRec != nil {
 			habitacionID = afterRec.HabitacionID
-			delta = afterRec.Cantidad
+			delta = afterRec.Cantidad * capacidadPorCama(afterRec.TipoCamaID)
 		}
 	case OpUpdate:
 		if afterRec != nil && beforeRec != nil {
 			habitacionID = afterRec.HabitacionID
 			if afterRec.EliminadoAt != nil && beforeRec.EliminadoAt == nil {
-				delta = -beforeRec.Cantidad
+				// soft-delete: restar capacidad anterior
+				delta = -(beforeRec.Cantidad * capacidadPorCama(beforeRec.TipoCamaID))
 			} else if afterRec.EliminadoAt == nil && beforeRec.EliminadoAt != nil {
-				delta = afterRec.Cantidad
+				// restauración: sumar capacidad nueva
+				delta = afterRec.Cantidad * capacidadPorCama(afterRec.TipoCamaID)
 			} else {
-				delta = afterRec.Cantidad - beforeRec.Cantidad
+				// actualización normal: diferencia neta
+				delta = afterRec.Cantidad*capacidadPorCama(afterRec.TipoCamaID) -
+					beforeRec.Cantidad*capacidadPorCama(beforeRec.TipoCamaID)
 			}
 		}
 	case OpDelete:
 		if beforeRec != nil {
 			habitacionID = beforeRec.HabitacionID
-			delta = -beforeRec.Cantidad
+			delta = -(beforeRec.Cantidad * capacidadPorCama(beforeRec.TipoCamaID))
 		}
 	}
 

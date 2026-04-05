@@ -123,7 +123,10 @@ func NewRouter(
 			r.With(auth.RequireRole(
 				auth.RoleResponsableRegistro,
 				auth.RoleTecnicoRegistro,
-			)).Post("/{id}/habitaciones", estHandler.CreateHabitacion)
+			)).Group(func(r chi.Router) {
+				r.Post("/{id}/habitaciones", estHandler.CreateHabitacion)
+				r.Put("/{id}/habitaciones/{habId}", estHandler.UpdateHabitacion)
+			})
 
 			// -- Personal --
 			r.Get("/{id}/personal", estHandler.ListPersonal)

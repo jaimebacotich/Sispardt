@@ -194,7 +194,9 @@ export function CheckinWizard({ onClose, fechaInicial }: CheckinWizardProps) {
   const { data: catalogs, isLoading: loadingCats } = useCatalogosMovimientos();
   const createParte = useCreateParte();
 
-  const habitacionesLibres = habitaciones.filter((h) => h.estado === "libre");
+  const habitacionesDisponibles = habitaciones.filter(
+    (h) => h.estado !== "mantenimiento" && h.ocupacionActual < h.capacidad
+  );
 
   const {
     control,
@@ -331,25 +333,46 @@ export function CheckinWizard({ onClose, fechaInicial }: CheckinWizardProps) {
         {step === 0 && (
           <div className="space-y-4">
             <h3 className="font-semibold text-foreground">Seleccionar habitación</h3>
-            {habitacionesLibres.length === 0 ? (
+            {habitacionesDisponibles.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4">No hay habitaciones disponibles.</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
-                {habitacionesLibres.map((hab) => (
-                  <button key={hab.id} type="button"
-                    onClick={() => setValue("habitacionId", hab.id)}
-                    className={cn(
-                      "rounded-xl border-2 p-4 text-left transition-all",
-                      w.habitacionId === hab.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 bg-card"
-                    )}
-                  >
-                    <div className="font-bold text-sm text-foreground">Hab. {hab.numero}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Piso {hab.piso} · {hab.tipoNombre}</div>
-                    <div className="flex items-center gap-1 mt-1.5 text-xs text-emerald-600 font-medium">
-                      <BedDouble size={11} />{hab.capacidad} pers.
-                    </div>
-                  </button>
-                ))}
+                {habitacionesDisponibles.map((hab) => {
+                  const libre = hab.ocupacionActual === 0;
+                  const pct = hab.capacidad > 0 ? (hab.ocupacionActual / hab.capacidad) * 100 : 0;
+                  return (
+                    <button key={hab.id} type="button"
+                      onClick={() => setValue("habitacionId", hab.id)}
+                      className={cn(
+                        "rounded-xl border-2 p-4 text-left transition-all",
+                        w.habitacionId === hab.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 bg-card"
+                      )}
+                    >
+                      <div className="font-bold text-sm text-foreground">Hab. {hab.numero}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Piso {hab.piso} · {hab.tipoNombre}</div>
+                      {libre ? (
+                        <div className="flex items-center gap-1 mt-1.5 text-xs text-emerald-600 font-medium">
+                          <BedDouble size={11} />{hab.capacidad} pers. · Libre
+                        </div>
+                      ) : (
+                        <div className="mt-1.5 space-y-0.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-amber-600 font-medium flex items-center gap-1">
+                              <BedDouble size={11} />{hab.ocupacionActual}/{hab.capacidad}
+                            </span>
+                            <span className="text-muted-foreground">{hab.capacidad - hab.ocupacionActual} libre{hab.capacidad - hab.ocupacionActual !== 1 ? "s" : ""}</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-amber-400 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
             {errors.habitacionId && <p className="text-xs text-destructive">{errors.habitacionId.message}</p>}

@@ -23,6 +23,7 @@ interface FilaHistorial {
   checkins: number;
   checkouts: number;
   reportadoPor: string | null;
+  reportadoPorNombre: string | null;
   fechaHora: string | null; // ISO datetime, null si abierto
   condicion: Condicion;
 }
@@ -80,6 +81,7 @@ export default function ReporteFueraDePlazoPage() {
       checkins:     p.totalCheckins,
       checkouts:    p.totalCheckouts,
       reportadoPor: null,
+      reportadoPorNombre: null,
       fechaHora:    null,
       condicion:    "FUERA_PLAZO",
     }));
@@ -90,7 +92,8 @@ export default function ReporteFueraDePlazoPage() {
       estado:       "Cerrado",
       checkins:     c.totalCheckins,
       checkouts:    c.totalCheckouts,
-      reportadoPor: c.cerradoPor,
+      reportadoPor: c.cerradoPorUsername ?? c.cerradoPor,
+      reportadoPorNombre: c.cerradoPorNombreCompleto ?? null,
       fechaHora:    c.cerradoAt,
       condicion:    c.condicionEntrega as Condicion,
     }));
@@ -351,8 +354,19 @@ export default function ReporteFueraDePlazoPage() {
                     </td>
 
                     {/* Reportado por */}
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
-                      {fila.reportadoPor ?? "—"}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {fila.reportadoPor ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">
+                            {fila.reportadoPor.includes("-") ? (
+                              <span className="font-mono">{fila.reportadoPor.slice(0, 8)}…</span>
+                            ) : `@${fila.reportadoPor}`}
+                          </span>
+                          {fila.reportadoPorNombre && (
+                            <span className="text-xs text-muted-foreground">{fila.reportadoPorNombre}</span>
+                          )}
+                        </div>
+                      ) : "—"}
                     </td>
 
                     {/* Fecha y hora */}

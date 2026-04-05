@@ -132,12 +132,20 @@ export function HabitacionesGrid() {
                 <div className="text-xs text-muted-foreground">{hab.tipoNombre}</div>
                 <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                   <BedDouble size={11} />
-                  <span>{hab.capacidad}p</span>
+                  {hab.ocupacionActual > 0 ? (
+                    <span className="font-medium text-amber-600">{hab.ocupacionActual}/{hab.capacidad}p</span>
+                  ) : (
+                    <span>{hab.capacidad}p</span>
+                  )}
                 </div>
-                {hab.huespedActual && (
-                  <div className="flex items-center gap-1 mt-1.5 text-xs font-medium text-foreground">
-                    <User size={11} />
-                    <span className="truncate">{hab.huespedActual}</span>
+                {hab.huespedes && hab.huespedes.length > 0 && (
+                  <div className="mt-1.5 space-y-0.5">
+                    {hab.huespedes.map((nombre, i) => (
+                      <div key={i} className="flex items-center gap-1 text-xs font-medium text-foreground">
+                        <User size={11} className="flex-shrink-0" />
+                        <span className="truncate">{nombre}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
 

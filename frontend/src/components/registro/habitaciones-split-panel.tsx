@@ -28,16 +28,31 @@ const camaSchema = z.object({
   cantidad: z.coerce.number().min(1).max(10),
 });
 
-const habitacionSchema = z.object({
-  nroHabitacion: z.preprocess(
-    (val) => (val == null ? "" : String(val)),
-    z.string().min(1, "El número de habitación es requerido")
-  ),
-  piso: z.string().optional(),
-  tipoHabitacionId: z.preprocess((val) => (val === "" || val == null ? null : Number(val)), z.number().nullable().optional()),
-  tieneBanoPrivado: z.boolean().default(false),
-  camas: z.array(camaSchema).min(1, "Agrega al menos una cama"),
-});
+const habitacionSchema = z
+  .object({
+    nroHabitacion: z.preprocess(
+      (val) => (val == null ? "" : String(val)),
+      z.string().min(1, "El número de habitación es requerido")
+    ),
+    piso: z.string().optional(),
+    tipoHabitacionId: z.preprocess(
+      (val) => (val === "" || val == null ? null : Number(val)),
+      z.number().nullable().optional()
+    ),
+    tieneBanoPrivado: z.boolean().default(false),
+    camas: z.array(camaSchema).min(1, "Agrega al menos una cama"),
+  })
+  .superRefine((data, ctx) => {
+    const ids = data.camas.map((c) => c.tipoCamaId).filter((id) => id > 0);
+    const duplicados = ids.filter((id, i) => ids.indexOf(id) !== i);
+    if (duplicados.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["camas"],
+        message: "No puedes agregar el mismo tipo de cama dos veces. Aumenta la cantidad en su lugar.",
+      });
+    }
+  });
 
 type HabitacionForm = z.infer<typeof habitacionSchema>;
 
@@ -177,8 +192,27 @@ export function HabitacionesSplitPanel({
         loadHabitacion(created);
         toast.success("Habitación creada");
       } else {
-        // Actualización no implementada en el backend aún — refrescar desde servidor
-        toast.info("Actualización no disponible todavía");
+        if (!selectedId) return;
+        const updated = await establecimientosApi.updateHabitacion(
+          token,
+          establecimientoId,
+          selectedId,
+          {
+            tipoHabitacionId: data.tipoHabitacionId ?? null,
+            nroHabitacion: data.nroHabitacion,
+            piso: data.piso?.trim() || null,
+            tieneBanoPrivado: data.tieneBanoPrivado,
+            camas: data.camas.map((c) => ({
+              tipoCamaId: Number(c.tipoCamaId),
+              cantidad: c.cantidad,
+            })),
+          }
+        );
+        setHabitaciones((prev) =>
+          prev.map((h) => (h.id === selectedId ? updated : h))
+        );
+        loadHabitacion(updated);
+        toast.success("Habitación actualizada");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al guardar";
@@ -376,23 +410,35 @@ export function HabitacionesSplitPanel({
 
               {/* Configuración de camas */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm text-foreground">
-                    Configuración de Camas
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => append({ tipoCamaId: 0, cantidad: 1 })}
-                    className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-                  >
-                    <Plus size={13} />
-                    Agregar Cama
-                  </button>
-                </div>
+                {(() => {
+                  const tiposYaUsados = watchedCamas
+                    .map((c) => String(c.tipoCamaId))
+                    .filter((id) => id !== "0");
+                  const hayTiposLibres = tiposCama.some(
+                    (t) => !tiposYaUsados.includes(t.id)
+                  );
+                  return (
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm text-foreground">
+                        Configuración de Camas
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => append({ tipoCamaId: 0, cantidad: 1 })}
+                        disabled={!hayTiposLibres}
+                        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!hayTiposLibres ? "Ya están configurados todos los tipos de cama disponibles" : undefined}
+                      >
+                        <Plus size={13} />
+                        Agregar Cama
+                      </button>
+                    </div>
+                  );
+                })()}
 
-                {errors.camas && (
+                {(errors.camas?.root?.message || (errors.camas as { message?: string })?.message) && (
                   <p className="text-xs text-destructive">
-                    {errors.camas.message as string}
+                    {errors.camas?.root?.message ?? (errors.camas as { message?: string })?.message}
                   </p>
                 )}
 
@@ -432,12 +478,21 @@ export function HabitacionesSplitPanel({
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {tiposCama.map((t) => (
-                              <SelectItem key={t.id} value={String(t.id)}>
-                                {t.nombre} ({t.capacidadPersonas}{" "}
-                                {t.capacidadPersonas === 1 ? "persona" : "personas"})
-                              </SelectItem>
-                            ))}
+                            {tiposCama
+                              .filter((t) => {
+                                // Mostrar: tipos no usados en otras filas + el tipo de esta fila
+                                const tiposOtrasFilas = watchedCamas
+                                  .filter((_, i) => i !== index)
+                                  .map((c) => String(c.tipoCamaId))
+                                  .filter((id) => id !== "0");
+                                return !tiposOtrasFilas.includes(t.id);
+                              })
+                              .map((t) => (
+                                <SelectItem key={t.id} value={String(t.id)}>
+                                  {t.nombre} ({t.capacidadPersonas}{" "}
+                                  {t.capacidadPersonas === 1 ? "persona" : "personas"})
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -489,7 +544,7 @@ export function HabitacionesSplitPanel({
             <div className="border-t border-border px-6 py-4 flex items-center gap-3">
               <button
                 type="submit"
-                disabled={isLoading || !isNew}
+                disabled={isLoading}
                 className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-70"
               >
                 {isLoading ? (
@@ -500,7 +555,7 @@ export function HabitacionesSplitPanel({
                 ) : isNew ? (
                   "Crear Habitación"
                 ) : (
-                  "Habitación guardada"
+                  "Guardar Cambios"
                 )}
               </button>
               <button

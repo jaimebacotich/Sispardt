@@ -97,14 +97,15 @@ type Persona struct {
 // ─── Habitación Estado ────────────────────────────────────────────────────────
 
 type HabitacionEstado struct {
-	ID            string  `json:"id"`
-	Numero        string  `json:"numero"`
-	Piso          *string `json:"piso"`
-	TipoNombre    string  `json:"tipoNombre"`
-	Capacidad     int     `json:"capacidad"`
-	Estado        string  `json:"estado"` // libre | ocupada | mantenimiento
-	ParteActualId *string `json:"parteActualId,omitempty"`
-	HuespedActual *string `json:"huespedActual,omitempty"`
+	ID              string  `json:"id"`
+	Numero          string  `json:"numero"`
+	Piso            *string `json:"piso"`
+	TipoNombre      string  `json:"tipoNombre"`
+	Capacidad       int     `json:"capacidad"`
+	OcupacionActual int     `json:"ocupacionActual"`
+	Estado          string  `json:"estado"` // libre | ocupada | mantenimiento
+	ParteActualId   *string  `json:"parteActualId,omitempty"`
+	Huespedes       []string `json:"huespedes,omitempty"`
 }
 
 // ─── Parte Diario ─────────────────────────────────────────────────────────────
@@ -131,9 +132,11 @@ type ParteDiarioResponse struct {
 	LocalidadDestinoNombre     *string          `json:"localidadDestinoNombre"`
 	MotivoViajeID              *int             `json:"motivoViajeId"`
 	MotivoViajeNombre          *string          `json:"motivoViajeNombre"`
-	EstadoOperativo            string           `json:"estadoOperativo"`
-	CondicionEntrega           string           `json:"condicionEntrega"`
-	CreadoAt                   string           `json:"creadoAt"`
+	EstadoOperativo              string           `json:"estadoOperativo"`
+	CondicionEntrega             string           `json:"condicionEntrega"`
+	CreadoAt                     string           `json:"creadoAt"`
+	RecepcionistaUsername        *string          `json:"recepcionistaUsername"`
+	RecepcionistaNombreCompleto  *string          `json:"recepcionistaNombreCompleto"`
 }
 
 // ParteDiario — dominio interno.
@@ -150,8 +153,11 @@ type ParteDiario struct {
 	PaisDestinoID           *int
 	LocalidadDestinoID      *int
 	MotivoViajeID           *int
-	KeycloakRecepcionistaID string
-	HabNroSnapshot          *string
+	KeycloakRecepcionistaID    string
+	RecepcionistaUsername      string
+	RecepcionistaNombre        string
+	RecepcionistaApellido      string
+	HabNroSnapshot             *string
 	HabTipoSnapshot         *string
 	HabPisoSnapshot         *string
 	EstadoOperativo         string
@@ -191,24 +197,29 @@ type CierreDiarioResponse struct {
 	TotalRegistros    int     `json:"totalRegistros"`
 	TotalCheckins     int     `json:"totalCheckins"`
 	TotalCheckouts    int     `json:"totalCheckouts"`
-	CerradoPor        string  `json:"cerradoPor"`
-	CerradoAt         string  `json:"cerradoAt"`
-	Observacion       *string `json:"observacion"`
-	CondicionEntrega  string  `json:"condicionEntrega"`
+	CerradoPor              string  `json:"cerradoPor"`
+	CerradoPorUsername      *string `json:"cerradoPorUsername"`
+	CerradoPorNombreCompleto *string `json:"cerradoPorNombreCompleto"`
+	CerradoAt               string  `json:"cerradoAt"`
+	Observacion             *string `json:"observacion"`
+	CondicionEntrega        string  `json:"condicionEntrega"`
 }
 
 // CierreDiario — dominio interno.
 type CierreDiario struct {
-	ID                string
-	EstablecimientoID string
-	FechaReporte      string
-	TotalRegistros    int
-	TotalCheckins     int
-	TotalCheckouts    int
-	CerradoPor        string
-	CerradoAt         time.Time
-	Observacion       *string
-	CondicionEntrega  string
+	ID                    string
+	EstablecimientoID     string
+	FechaReporte          string
+	TotalRegistros        int
+	TotalCheckins         int
+	TotalCheckouts        int
+	CerradoPor            string
+	CerradoPorUsername    string
+	CerradoPorNombre      string
+	CerradoPorApellido    string
+	CerradoAt             time.Time
+	Observacion           *string
+	CondicionEntrega      string
 }
 
 // CreateCierreDiarioRequest — acepta JSON camelCase del frontend.

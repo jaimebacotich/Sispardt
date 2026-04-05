@@ -123,6 +123,26 @@ func (s *EstablecimientoService) CreateHabitacion(ctx context.Context, estableci
 	return result, nil
 }
 
+func (s *EstablecimientoService) UpdateHabitacion(ctx context.Context, establecimientoID, habitacionID, userID, clientIP string, req domain.UpdateHabitacionRequest) (*domain.HabitacionResponse, error) {
+	if req.NroHabitacion == "" {
+		return nil, fmt.Errorf("nro_habitacion es requerido")
+	}
+	if len(req.Camas) == 0 {
+		return nil, fmt.Errorf("la habitacion debe tener al menos una cama")
+	}
+
+	var result *domain.HabitacionResponse
+	err := repository.WithAuditTx(ctx, s.pool, userID, clientIP, func(tx pgx.Tx) error {
+		var err error
+		result, err = s.repo.UpdateHabitacion(ctx, tx, establecimientoID, habitacionID, req)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // ─── Personal ────────────────────────────────────────────────────────────────
 
 func (s *EstablecimientoService) ListPersonal(ctx context.Context, establecimientoID string) ([]domain.PersonalResponse, error) {

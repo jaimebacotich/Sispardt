@@ -286,14 +286,15 @@ export interface PersonaCreate {
 export type EstadoHabitacion = "libre" | "ocupada" | "mantenimiento";
 
 export interface HabitacionEstado {
-  id: string;           // habitacion_id (uuid)
-  numero: string;       // nro_habitacion
-  piso: string;         // piso (varchar en BD)
-  tipoNombre: string;   // tipo_habitacion
-  capacidad: number;    // capacidad_calculada
+  id: string;              // habitacion_id (uuid)
+  numero: string;          // nro_habitacion
+  piso: string;            // piso (varchar en BD)
+  tipoNombre: string;      // tipo_habitacion
+  capacidad: number;       // capacidad_calculada
+  ocupacionActual: number; // huéspedes activos en este momento
   estado: EstadoHabitacion;
   parteActualId?: string;
-  huespedActual?: string; // nombre completo del huésped activo
+  huespedes?: string[];    // nombres de todos los huéspedes activos
 }
 
 /* ============================================================
@@ -327,6 +328,8 @@ export interface ParteDiario {
   estadoOperativo: EstadoOperativo;
   condicionEntrega: CondicionEntrega;
   creadoAt: string;
+  recepcionistaUsername: string | null;
+  recepcionistaNombreCompleto: string | null;
 }
 
 export interface ParteDiarioCreate {
@@ -352,6 +355,8 @@ export interface CierreDiario {
   totalCheckins: number;
   totalCheckouts: number;
   cerradoPor: string;
+  cerradoPorUsername: string | null;
+  cerradoPorNombreCompleto: string | null;
   cerradoAt: string;
   observacion?: string;
   condicionEntrega: CondicionEntrega;

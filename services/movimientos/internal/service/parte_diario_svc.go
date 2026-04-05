@@ -77,7 +77,7 @@ func (s *ParteDiarioService) GetByID(ctx context.Context, id, establecimientoID 
 	return s.repo.GetByID(ctx, id, establecimientoID)
 }
 
-func (s *ParteDiarioService) Create(ctx context.Context, userID, clientIP, establecimientoID string, req domain.CreateParteDiarioRequest) (*domain.ParteDiarioResponse, error) {
+func (s *ParteDiarioService) Create(ctx context.Context, userID, username, firstName, lastName, clientIP, establecimientoID string, req domain.CreateParteDiarioRequest) (*domain.ParteDiarioResponse, error) {
 	if userID == "" {
 		return nil, fmt.Errorf("userID (sub) no encontrado en el token")
 	}
@@ -103,7 +103,7 @@ func (s *ParteDiarioService) Create(ctx context.Context, userID, clientIP, estab
 		if err != nil {
 			return err
 		}
-		created, err = s.repo.CreateParte(ctx, tx, persona.ID, establecimientoID, userID, req, hab)
+		created, err = s.repo.CreateParte(ctx, tx, persona.ID, establecimientoID, userID, username, firstName, lastName, req, hab)
 		return err
 	})
 	if err != nil {
@@ -178,14 +178,14 @@ func (s *ParteDiarioService) GetFechasPendientes(ctx context.Context, establecim
 	return s.repo.GetFechasPendientes(ctx, establecimientoID, s.sistemaInicioDate)
 }
 
-func (s *ParteDiarioService) CreateCierre(ctx context.Context, userID, cerradoPor, clientIP, establecimientoID string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiarioResponse, error) {
+func (s *ParteDiarioService) CreateCierre(ctx context.Context, userID, cerradoPor, username, firstName, lastName, clientIP, establecimientoID string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiarioResponse, error) {
 	if req.FechaReporte == "" {
 		return nil, fmt.Errorf("fechaReporte es requerida")
 	}
 	var c *domain.CierreDiario
 	err := repository.WithAuditTx(ctx, s.pool, userID, clientIP, establecimientoID, func(tx pgx.Tx) error {
 		var err error
-		c, err = s.repo.CreateCierre(ctx, tx, establecimientoID, cerradoPor, req)
+		c, err = s.repo.CreateCierre(ctx, tx, establecimientoID, cerradoPor, username, firstName, lastName, req)
 		return err
 	})
 	if err != nil {
@@ -255,17 +255,38 @@ func parseFechas(desde, hasta string) (time.Time, time.Time, error) {
 }
 
 func toCierreResponse(c domain.CierreDiario) domain.CierreDiarioResponse {
+	var username *string
+	if c.CerradoPorUsername != "" {
+		u := c.CerradoPorUsername
+		username = &u
+	}
+	var nombreCompleto *string
+	nombre := ""
+	if c.CerradoPorNombre != "" {
+		nombre = c.CerradoPorNombre
+	}
+	if c.CerradoPorApellido != "" {
+		if nombre != "" {
+			nombre += " "
+		}
+		nombre += c.CerradoPorApellido
+	}
+	if nombre != "" {
+		nombreCompleto = &nombre
+	}
 	return domain.CierreDiarioResponse{
-		ID:                c.ID,
-		EstablecimientoID: c.EstablecimientoID,
-		FechaReporte:      c.FechaReporte,
-		TotalRegistros:    c.TotalRegistros,
-		TotalCheckins:     c.TotalCheckins,
-		TotalCheckouts:    c.TotalCheckouts,
-		CerradoPor:        c.CerradoPor,
-		CerradoAt:         c.CerradoAt.Format(time.RFC3339),
-		Observacion:       c.Observacion,
-		CondicionEntrega:  c.CondicionEntrega,
+		ID:                       c.ID,
+		EstablecimientoID:        c.EstablecimientoID,
+		FechaReporte:             c.FechaReporte,
+		TotalRegistros:           c.TotalRegistros,
+		TotalCheckins:            c.TotalCheckins,
+		TotalCheckouts:           c.TotalCheckouts,
+		CerradoPor:               c.CerradoPor,
+		CerradoPorUsername:       username,
+		CerradoPorNombreCompleto: nombreCompleto,
+		CerradoAt:                c.CerradoAt.Format(time.RFC3339),
+		Observacion:              c.Observacion,
+		CondicionEntrega:         c.CondicionEntrega,
 	}
 }
 

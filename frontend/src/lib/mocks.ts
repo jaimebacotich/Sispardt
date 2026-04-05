@@ -132,13 +132,13 @@ const PERSONA_ANA: Persona = {
 // ── Habitaciones iniciales (IDs reales del replica cache) ────
 
 const INIT_HABITACIONES: HabitacionEstado[] = [
-  { id: "11111111-1111-1111-1111-111111111101", numero: "101", piso: "1", tipoNombre: "Individual",  capacidad: 1, estado: "libre" },
-  { id: "11111111-1111-1111-1111-111111111102", numero: "102", piso: "1", tipoNombre: "Doble",       capacidad: 2, estado: "ocupada",       huespedActual: "Juan Pérez García",    parteActualId: "p-00000001" },
-  { id: "11111111-1111-1111-1111-111111111103", numero: "103", piso: "1", tipoNombre: "Matrimonial", capacidad: 2, estado: "libre" },
-  { id: "11111111-1111-1111-1111-111111111104", numero: "104", piso: "1", tipoNombre: "Triple",      capacidad: 3, estado: "mantenimiento" },
-  { id: "11111111-1111-1111-1111-111111111201", numero: "201", piso: "2", tipoNombre: "Familiar",    capacidad: 4, estado: "ocupada",       huespedActual: "María García Quispe",  parteActualId: "p-00000003" },
-  { id: "11111111-1111-1111-1111-111111111202", numero: "202", piso: "2", tipoNombre: "Suite",       capacidad: 2, estado: "libre" },
-  { id: "11111111-1111-1111-1111-111111111203", numero: "203", piso: "2", tipoNombre: "Doble",       capacidad: 2, estado: "ocupada",       huespedActual: "Pedro Martínez Silva", parteActualId: "p-00000004" },
+  { id: "11111111-1111-1111-1111-111111111101", numero: "101", piso: "1", tipoNombre: "Individual",  capacidad: 1, ocupacionActual: 0, estado: "libre" },
+  { id: "11111111-1111-1111-1111-111111111102", numero: "102", piso: "1", tipoNombre: "Doble",       capacidad: 2, ocupacionActual: 1, estado: "libre",        huespedes: ["Juan Pérez García"],              parteActualId: "p-00000001" },
+  { id: "11111111-1111-1111-1111-111111111103", numero: "103", piso: "1", tipoNombre: "Matrimonial", capacidad: 2, ocupacionActual: 0, estado: "libre" },
+  { id: "11111111-1111-1111-1111-111111111104", numero: "104", piso: "1", tipoNombre: "Triple",      capacidad: 3, ocupacionActual: 0, estado: "mantenimiento" },
+  { id: "11111111-1111-1111-1111-111111111201", numero: "201", piso: "2", tipoNombre: "Familiar",    capacidad: 4, ocupacionActual: 1, estado: "libre",        huespedes: ["María García Quispe"],            parteActualId: "p-00000003" },
+  { id: "11111111-1111-1111-1111-111111111202", numero: "202", piso: "2", tipoNombre: "Suite",       capacidad: 2, ocupacionActual: 0, estado: "libre" },
+  { id: "11111111-1111-1111-1111-111111111203", numero: "203", piso: "2", tipoNombre: "Doble",       capacidad: 2, ocupacionActual: 1, estado: "libre",        huespedes: ["Pedro Martínez Silva"],           parteActualId: "p-00000004" },
 ];
 
 // ── Partes iniciales ─────────────────────────────────────────
@@ -157,6 +157,7 @@ const INIT_PARTES: ParteDiario[] = [
     motivoViajeId: 2, motivoViajeNombre: "Negocios",
     estadoOperativo: "ACTIVO", condicionEntrega: "DENTRO_PLAZO",
     creadoAt: "2026-03-09T08:45:00Z",
+    recepcionistaUsername: null, recepcionistaNombreCompleto: null,
   },
   {
     id: "p-00000002", establecimientoId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
@@ -171,6 +172,7 @@ const INIT_PARTES: ParteDiario[] = [
     motivoViajeId: 1, motivoViajeNombre: "Turismo",
     estadoOperativo: "ACTIVO", condicionEntrega: "DENTRO_PLAZO",
     creadoAt: "2026-03-09T07:00:00Z",
+    recepcionistaUsername: null, recepcionistaNombreCompleto: null,
   },
   {
     id: "p-00000003", establecimientoId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
@@ -185,6 +187,7 @@ const INIT_PARTES: ParteDiario[] = [
     motivoViajeId: 4, motivoViajeNombre: "Salud",
     estadoOperativo: "ACTIVO", condicionEntrega: "DENTRO_PLAZO",
     creadoAt: "2026-03-09T09:00:00Z",
+    recepcionistaUsername: null, recepcionistaNombreCompleto: null,
   },
   {
     id: "p-00000004", establecimientoId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
@@ -199,6 +202,7 @@ const INIT_PARTES: ParteDiario[] = [
     motivoViajeId: 2, motivoViajeNombre: "Negocios",
     estadoOperativo: "ACTIVO", condicionEntrega: "DENTRO_PLAZO",
     creadoAt: "2026-03-09T07:30:00Z",
+    recepcionistaUsername: null, recepcionistaNombreCompleto: null,
   },
   {
     id: "p-00000005", establecimientoId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
@@ -213,6 +217,7 @@ const INIT_PARTES: ParteDiario[] = [
     motivoViajeId: 6, motivoViajeNombre: "Familiar",
     estadoOperativo: "ACTIVO", condicionEntrega: "FUERA_PLAZO",
     creadoAt: "2026-03-09T06:30:00Z",
+    recepcionistaUsername: null, recepcionistaNombreCompleto: null,
   },
 ];
 
@@ -224,33 +229,33 @@ const INIT_CIERRES: CierreDiario[] = [
   {
     id: "cierr-0001", establecimientoId: EST_ID,
     fechaReporte: "2026-03-01", totalRegistros: 3, totalCheckins: 3, totalCheckouts: 1,
-    cerradoPor: "María González", cerradoAt: "2026-03-02T08:15:00Z",
-    condicionEntrega: "DENTRO_PLAZO",
+    cerradoPor: "María González", cerradoPorUsername: null, cerradoPorNombreCompleto: null,
+    cerradoAt: "2026-03-02T08:15:00Z", condicionEntrega: "DENTRO_PLAZO",
   },
   {
     id: "cierr-0002", establecimientoId: EST_ID,
     fechaReporte: "2026-03-02", totalRegistros: 2, totalCheckins: 2, totalCheckouts: 2,
-    cerradoPor: "María González", cerradoAt: "2026-03-03T09:00:00Z",
-    condicionEntrega: "DENTRO_PLAZO",
+    cerradoPor: "María González", cerradoPorUsername: null, cerradoPorNombreCompleto: null,
+    cerradoAt: "2026-03-03T09:00:00Z", condicionEntrega: "DENTRO_PLAZO",
   },
   {
     id: "cierr-0003", establecimientoId: EST_ID,
     fechaReporte: "2026-03-03", totalRegistros: 1, totalCheckins: 1, totalCheckouts: 0,
-    cerradoPor: "María González", cerradoAt: "2026-03-04T07:45:00Z",
-    condicionEntrega: "DENTRO_PLAZO",
+    cerradoPor: "María González", cerradoPorUsername: null, cerradoPorNombreCompleto: null,
+    cerradoAt: "2026-03-04T07:45:00Z", condicionEntrega: "DENTRO_PLAZO",
   },
   {
     id: "cierr-0004", establecimientoId: EST_ID,
     fechaReporte: "2026-03-04", totalRegistros: 0, totalCheckins: 0, totalCheckouts: 0,
-    cerradoPor: "María González", cerradoAt: "2026-03-07T14:20:00Z",
-    observacion: "Sin Movimiento",
+    cerradoPor: "María González", cerradoPorUsername: null, cerradoPorNombreCompleto: null,
+    cerradoAt: "2026-03-07T14:20:00Z", observacion: "Sin Movimiento",
     condicionEntrega: "FUERA_PLAZO",
   },
   {
     id: "cierr-0005", establecimientoId: EST_ID,
     fechaReporte: "2026-03-05", totalRegistros: 4, totalCheckins: 4, totalCheckouts: 2,
-    cerradoPor: "María González", cerradoAt: "2026-03-06T08:30:00Z",
-    condicionEntrega: "DENTRO_PLAZO",
+    cerradoPor: "María González", cerradoPorUsername: null, cerradoPorNombreCompleto: null,
+    cerradoAt: "2026-03-06T08:30:00Z", condicionEntrega: "DENTRO_PLAZO",
   },
   // 2026-03-06, 2026-03-07 → pendientes (fuera de plazo)
   // 2026-03-08 → pendiente (cierre actual)
@@ -274,18 +279,21 @@ export const mockStore = {
   habitaciones: {
     getAll: (): HabitacionEstado[] => [..._habitaciones],
     ocupar(habitacionId: string, huespedNombre: string, parteId: string) {
-      _habitaciones = _habitaciones.map((h) =>
-        h.id === habitacionId
-          ? { ...h, estado: "ocupada" as const, huespedActual: huespedNombre, parteActualId: parteId }
-          : h
-      );
+      _habitaciones = _habitaciones.map((h) => {
+        if (h.id !== habitacionId) return h;
+        const nuevaOcupacion = h.ocupacionActual + 1;
+        const nuevoEstado = nuevaOcupacion >= h.capacidad ? "ocupada" as const : "libre" as const;
+        const huespedes = [...(h.huespedes ?? []), huespedNombre];
+        return { ...h, ocupacionActual: nuevaOcupacion, estado: nuevoEstado, huespedes, parteActualId: parteId };
+      });
     },
     liberar(habitacionId: string) {
-      _habitaciones = _habitaciones.map((h) =>
-        h.id === habitacionId
-          ? { ...h, estado: "libre" as const, huespedActual: undefined, parteActualId: undefined }
-          : h
-      );
+      _habitaciones = _habitaciones.map((h) => {
+        if (h.id !== habitacionId) return h;
+        const nuevaOcupacion = Math.max(0, h.ocupacionActual - 1);
+        const nuevoEstado = nuevaOcupacion === 0 ? "libre" as const : h.estado;
+        return { ...h, ocupacionActual: nuevaOcupacion, estado: nuevoEstado, huespedes: nuevaOcupacion === 0 ? [] : h.huespedes, parteActualId: nuevaOcupacion === 0 ? undefined : h.parteActualId };
+      });
     },
   },
 
@@ -367,6 +375,8 @@ export const mockStore = {
         estadoOperativo: "ACTIVO",
         condicionEntrega: condicion,
         creadoAt: new Date().toISOString(),
+        recepcionistaUsername: null,
+        recepcionistaNombreCompleto: null,
       };
 
       _partes = [newParte, ..._partes];
@@ -418,6 +428,8 @@ export const mockStore = {
         totalCheckins,
         totalCheckouts,
         cerradoPor: "María González",
+        cerradoPorUsername: null,
+        cerradoPorNombreCompleto: null,
         cerradoAt: new Date().toISOString(),
         observacion: observacion || undefined,
         condicionEntrega: condicion,

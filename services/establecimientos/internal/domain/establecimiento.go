@@ -89,6 +89,14 @@ type CreateHabitacionRequest struct {
 	Camas            []CreateHabitacionCama `json:"camas"`
 }
 
+type UpdateHabitacionRequest struct {
+	TipoHabitacionID *int                   `json:"tipoHabitacionId"`
+	NroHabitacion    string                 `json:"nroHabitacion"`
+	Piso             *string                `json:"piso"`
+	TieneBanoPrivado bool                   `json:"tieneBanoPrivado"`
+	Camas            []CreateHabitacionCama `json:"camas"`
+}
+
 type HabitacionCama struct {
 	ID           int        `json:"id"`
 	HabitacionID string     `json:"habitacionId"`

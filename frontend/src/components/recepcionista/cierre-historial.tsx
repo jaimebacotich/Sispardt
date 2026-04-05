@@ -105,8 +105,17 @@ export function CierreHistorial() {
                   </td>
 
                   {/* Reportado por */}
-                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                    {c.cerradoPor}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {c.cerradoPorUsername ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-foreground">@{c.cerradoPorUsername}</span>
+                        {c.cerradoPorNombreCompleto && (
+                          <span className="text-xs text-muted-foreground">{c.cerradoPorNombreCompleto}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground font-mono">{c.cerradoPor.slice(0, 8)}…</span>
+                    )}
                   </td>
 
                   {/* Fecha y hora */}

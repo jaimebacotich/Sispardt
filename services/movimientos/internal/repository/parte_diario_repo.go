@@ -9,6 +9,7 @@ import (
 
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"sispardt/movimientos/internal/domain"
@@ -119,11 +120,13 @@ func (r *ParteDiarioRepo) GetCatalogos(ctx context.Context) (*domain.CatalogosMo
 // ─── Habitaciones Estado ──────────────────────────────────────────────────────
 
 func (r *ParteDiarioRepo) GetHabitacionesEstado(ctx context.Context, establecimientoID, fecha string) ([]domain.HabitacionEstado, error) {
-	// Cuando fecha != "", consulta estado histórico: habitaciones ocupadas en esa fecha.
-	// Cuando fecha == "", consulta estado actual.
-	ocupacionCond := "p.estado_operativo = 'ACTIVO' AND p.salida_at IS NULL"
+	// Agrega huéspedes activos por habitación; no produce filas duplicadas.
+	// Cuando fecha != "" consulta estado histórico.
+	var ocupacionCond string
 	if fecha != "" {
 		ocupacionCond = "p.estado_operativo = 'ACTIVO' AND p.fecha_reporte <= $2::date AND (p.salida_at IS NULL OR p.salida_at::date > $2::date)"
+	} else {
+		ocupacionCond = "p.estado_operativo = 'ACTIVO' AND p.salida_at IS NULL"
 	}
 	sql := `
 		SELECT
@@ -133,14 +136,28 @@ func (r *ParteDiarioRepo) GetHabitacionesEstado(ctx context.Context, establecimi
 			h.tipo_habitacion,
 			h.capacidad_calculada,
 			h.estado_actual,
-			p.id AS parte_id,
-			NULLIF(TRIM(per.nombre || ' ' || per.apellido_paterno
-				|| COALESCE(' ' || per.apellido_materno, '')), '') AS huesped
+			COALESCE(occ.ocupacion_actual, 0)  AS ocupacion_actual,
+			occ.parte_id,
+			occ.huespedes
 		FROM public.habitaciones_replica_cache h
-		LEFT JOIN public.partes_diarios p
-			ON p.habitacion_id = h.habitacion_id
-			AND ` + ocupacionCond + `
-		LEFT JOIN public.personas per ON per.id = p.persona_id
+		LEFT JOIN (
+			SELECT
+				p.habitacion_id,
+				COUNT(*)                                                          AS ocupacion_actual,
+				MIN(p.id::text)                                                   AS parte_id,
+				ARRAY_REMOVE(
+					ARRAY_AGG(
+						NULLIF(TRIM(COALESCE(per.nombre,'') || ' '
+							|| COALESCE(per.apellido_paterno,'')
+							|| COALESCE(' ' || per.apellido_materno, '')), '')
+						ORDER BY per.nombre, per.apellido_paterno
+					), NULL
+				)                                                                 AS huespedes
+			FROM public.partes_diarios p
+			LEFT JOIN public.personas per ON per.id = p.persona_id
+			WHERE ` + ocupacionCond + `
+			GROUP BY p.habitacion_id
+		) occ ON occ.habitacion_id = h.habitacion_id
 		WHERE h.establecimiento_id = $1
 		  AND h.eliminado_at IS NULL
 		ORDER BY h.nro_habitacion`
@@ -163,20 +180,26 @@ func (r *ParteDiarioRepo) GetHabitacionesEstado(ctx context.Context, establecimi
 			var h domain.HabitacionEstado
 			var estadoActual string
 			var parteID *string
-			var huesped *string
+			var huespedes pgtype.Array[pgtype.Text]
 			if err := rows.Scan(
 				&h.ID, &h.Numero, &h.Piso, &h.TipoNombre, &h.Capacidad,
-				&estadoActual, &parteID, &huesped,
+				&estadoActual, &h.OcupacionActual, &parteID, &huespedes,
 			); err != nil {
 				return err
 			}
-			if parteID != nil {
-				h.Estado = "ocupada"
-				h.ParteActualId = parteID
-				h.HuespedActual = huesped
-			} else if estadoActual == "MANTENIMIENTO" {
+			h.ParteActualId = parteID
+			h.Huespedes = make([]string, 0, len(huespedes.Elements))
+			for _, t := range huespedes.Elements {
+				if t.Valid {
+					h.Huespedes = append(h.Huespedes, t.String)
+				}
+			}
+			switch {
+			case estadoActual == "MANTENIMIENTO":
 				h.Estado = "mantenimiento"
-			} else {
+			case h.Capacidad > 0 && h.OcupacionActual >= h.Capacidad:
+				h.Estado = "ocupada"
+			default:
 				h.Estado = "libre"
 			}
 			results = append(results, h)
@@ -251,7 +274,7 @@ func (r *ParteDiarioRepo) GetHabitacionCache(ctx context.Context, tx pgx.Tx, hab
 
 // ─── Crear Parte ──────────────────────────────────────────────────────────────
 
-func (r *ParteDiarioRepo) CreateParte(ctx context.Context, tx pgx.Tx, personaID, establecimientoID, recepcionistaID string, req domain.CreateParteDiarioRequest, hab *domain.HabitacionResumen) (*domain.ParteDiario, error) {
+func (r *ParteDiarioRepo) CreateParte(ctx context.Context, tx pgx.Tx, personaID, establecimientoID, recepcionistaID, username, nombre, apellido string, req domain.CreateParteDiarioRequest, hab *domain.HabitacionResumen) (*domain.ParteDiario, error) {
 	condicion := "DENTRO_PLAZO"
 	if fechaLimite, err := time.Parse("2006-01-02", req.FechaReporte); err == nil {
 		if time.Now().After(fechaLimite.Add(48 * time.Hour)) {
@@ -265,11 +288,13 @@ func (r *ParteDiarioRepo) CreateParte(ctx context.Context, tx pgx.Tx, personaID,
 			ingreso_at, pais_procedencia_id, localidad_procedencia_id,
 			pais_destino_id, localidad_destino_id, motivo_viaje_id,
 			keycloak_recepcionista_id,
+			recepcionista_username, recepcionista_nombre, recepcionista_apellido,
 			hab_nro_snapshot, hab_tipo_snapshot, hab_piso_snapshot,
 			condicion_entrega
-		) VALUES ($1,$2,$3,$4,($4::date)::timestamp AT TIME ZONE 'America/La_Paz',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+		) VALUES ($1,$2,$3,$4,($4::date)::timestamp AT TIME ZONE 'America/La_Paz',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		RETURNING id, establecimiento_id, habitacion_id, persona_id, fecha_reporte::text,
 		          ingreso_at, salida_at, keycloak_recepcionista_id,
+		          recepcionista_username, recepcionista_nombre, recepcionista_apellido,
 		          hab_nro_snapshot, hab_tipo_snapshot, hab_piso_snapshot,
 		          pais_procedencia_id, localidad_procedencia_id,
 		          pais_destino_id, localidad_destino_id, motivo_viaje_id,
@@ -281,12 +306,13 @@ func (r *ParteDiarioRepo) CreateParte(ctx context.Context, tx pgx.Tx, personaID,
 		establecimientoID, req.HabitacionID, personaID, req.FechaReporte,
 		req.PaisProcedenciaID, req.LocalidadProcedenciaID,
 		req.PaisDestinoID, req.LocalidadDestinoID, req.MotivoViajeID,
-		recepcionistaID,
+		recepcionistaID, username, nombre, apellido,
 		hab.NroHabitacion, hab.TipoHabitacion, hab.Piso,
 		condicion,
 	).Scan(
 		&p.ID, &p.EstablecimientoID, &p.HabitacionID, &p.PersonaID, &fr,
 		&p.IngresoAt, &p.SalidaAt, &p.KeycloakRecepcionistaID,
+		&p.RecepcionistaUsername, &p.RecepcionistaNombre, &p.RecepcionistaApellido,
 		&p.HabNroSnapshot, &p.HabTipoSnapshot, &p.HabPisoSnapshot,
 		&p.PaisProcedenciaID, &p.LocalidadProcedenciaID,
 		&p.PaisDestinoID, &p.LocalidadDestinoID, &p.MotivoViajeID,
@@ -343,6 +369,8 @@ func listParteSQL(where string, limitIdx, offsetIdx int) string {
 	       pd.localidad_destino_id, ld.nombre AS loc_dest_nombre,
 	       pd.motivo_viaje_id, mv.nombre AS motivo_nombre,
 	       pd.estado_operativo, pd.condicion_entrega, pd.creado_at,
+	       pd.recepcionista_username,
+	       NULLIF(TRIM(COALESCE(pd.recepcionista_nombre,'') || ' ' || COALESCE(pd.recepcionista_apellido,'')), '') AS recepcionista_nombre_completo,
 	       per.id AS per_id, per.tipo_documento_id, td.sigla AS td_sigla,
 	       per.documento_identidad, per.pais_origen_id, po.nombre AS pais_origen_nombre,
 	       per.nombre AS per_nombre, per.apellido_paterno, per.apellido_materno,
@@ -391,6 +419,7 @@ func scanParteRow(rows pgx.Rows) (*domain.ParteDiarioResponse, error) {
 		&p.LocalidadDestinoID, &p.LocalidadDestinoNombre,
 		&p.MotivoViajeID, &p.MotivoViajeNombre,
 		&p.EstadoOperativo, &p.CondicionEntrega, &creadoAt,
+		&p.RecepcionistaUsername, &p.RecepcionistaNombreCompleto,
 		&perID, &perTipoDocID, &perTipoDocSigla,
 		&perDocIdentidad, &perPaisOrigenID, &perPaisOrigenNombre,
 		&perNombre, &perApPat, &perApMat,
@@ -606,7 +635,7 @@ func (r *ParteDiarioRepo) Anular(ctx context.Context, tx pgx.Tx, id string) erro
 
 // ─── Cierres ──────────────────────────────────────────────────────────────────
 
-func (r *ParteDiarioRepo) CreateCierre(ctx context.Context, tx pgx.Tx, establecimientoID, cerradoPor string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiario, error) {
+func (r *ParteDiarioRepo) CreateCierre(ctx context.Context, tx pgx.Tx, establecimientoID, cerradoPor, username, nombre, apellido string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiario, error) {
 	var totalCheckins int
 	if err := tx.QueryRow(ctx,
 		`SELECT COUNT(*) FROM public.partes_diarios
@@ -635,19 +664,25 @@ func (r *ParteDiarioRepo) CreateCierre(ctx context.Context, tx pgx.Tx, estableci
 	const sql = `
 		INSERT INTO public.cierres_diarios
 			(establecimiento_id, fecha_reporte, total_registros,
-			 total_checkins, total_checkouts, cerrado_por, observacion, condicion_entrega)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+			 total_checkins, total_checkouts, cerrado_por,
+			 cerrado_por_username, cerrado_por_nombre, cerrado_por_apellido,
+			 observacion, condicion_entrega)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 		RETURNING id, establecimiento_id, fecha_reporte::text, total_registros,
 		          total_checkins, total_checkouts, cerrado_por::text,
+		          cerrado_por_username, cerrado_por_nombre, cerrado_por_apellido,
 		          cerrado_at, observacion, condicion_entrega`
 
 	var c domain.CierreDiario
 	if err := tx.QueryRow(ctx, sql,
 		establecimientoID, req.FechaReporte, totalCheckins,
-		totalCheckins, totalCheckouts, cerradoPor, req.Observacion, condicion,
+		totalCheckins, totalCheckouts, cerradoPor,
+		username, nombre, apellido,
+		req.Observacion, condicion,
 	).Scan(
 		&c.ID, &c.EstablecimientoID, &c.FechaReporte, &c.TotalRegistros,
 		&c.TotalCheckins, &c.TotalCheckouts, &c.CerradoPor,
+		&c.CerradoPorUsername, &c.CerradoPorNombre, &c.CerradoPorApellido,
 		&c.CerradoAt, &c.Observacion, &c.CondicionEntrega,
 	); err != nil {
 		return nil, fmt.Errorf("crear cierre: %w", err)
@@ -659,6 +694,7 @@ func (r *ParteDiarioRepo) ListCierres(ctx context.Context, establecimientoID str
 	const sql = `
 		SELECT id, establecimiento_id, fecha_reporte::text, total_registros,
 		       total_checkins, total_checkouts, cerrado_por::text,
+		       cerrado_por_username, cerrado_por_nombre, cerrado_por_apellido,
 		       cerrado_at, observacion, condicion_entrega
 		FROM public.cierres_diarios
 		WHERE establecimiento_id=$1
@@ -677,6 +713,7 @@ func (r *ParteDiarioRepo) ListCierres(ctx context.Context, establecimientoID str
 			if err := rows.Scan(
 				&c.ID, &c.EstablecimientoID, &c.FechaReporte, &c.TotalRegistros,
 				&c.TotalCheckins, &c.TotalCheckouts, &c.CerradoPor,
+				&c.CerradoPorUsername, &c.CerradoPorNombre, &c.CerradoPorApellido,
 				&c.CerradoAt, &c.Observacion, &c.CondicionEntrega,
 			); err != nil {
 				return err
@@ -699,6 +736,7 @@ func (r *ParteDiarioRepo) GetCierrePorFecha(ctx context.Context, establecimiento
 	const sql = `
 		SELECT id, establecimiento_id, fecha_reporte::text, total_registros,
 		       total_checkins, total_checkouts, cerrado_por::text,
+		       cerrado_por_username, cerrado_por_nombre, cerrado_por_apellido,
 		       cerrado_at, observacion, condicion_entrega
 		FROM public.cierres_diarios
 		WHERE establecimiento_id=$1 AND fecha_reporte=$2`
@@ -708,6 +746,7 @@ func (r *ParteDiarioRepo) GetCierrePorFecha(ctx context.Context, establecimiento
 		return tx.QueryRow(ctx, sql, establecimientoID, fecha).Scan(
 			&c.ID, &c.EstablecimientoID, &c.FechaReporte, &c.TotalRegistros,
 			&c.TotalCheckins, &c.TotalCheckouts, &c.CerradoPor,
+			&c.CerradoPorUsername, &c.CerradoPorNombre, &c.CerradoPorApellido,
 			&c.CerradoAt, &c.Observacion, &c.CondicionEntrega,
 		)
 	})

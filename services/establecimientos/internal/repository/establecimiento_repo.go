@@ -456,6 +456,94 @@ func (r *EstablecimientoRepo) CreateHabitacion(ctx context.Context, tx pgx.Tx, e
 	return &h, nil
 }
 
+func (r *EstablecimientoRepo) UpdateHabitacion(ctx context.Context, tx pgx.Tx, establecimientoID, habitacionID string, req domain.UpdateHabitacionRequest) (*domain.HabitacionResponse, error) {
+	_, err := tx.Exec(ctx,
+		`UPDATE public.habitaciones
+		 SET tipo_habitacion_id = $1, nro_habitacion = $2, piso = $3, tiene_bano_privado = $4
+		 WHERE id = $5 AND establecimiento_id = $6`,
+		req.TipoHabitacionID, req.NroHabitacion, req.Piso, req.TieneBanoPrivado,
+		habitacionID, establecimientoID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("actualizar habitacion: %w", err)
+	}
+
+	// Reemplazar camas: eliminar todas las existentes y re-insertar
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM public.habitacion_camas WHERE habitacion_id = $1`,
+		habitacionID,
+	); err != nil {
+		return nil, fmt.Errorf("eliminar camas anteriores: %w", err)
+	}
+
+	for _, c := range req.Camas {
+		if c.Cantidad <= 0 {
+			continue
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO public.habitacion_camas (habitacion_id, tipo_cama_id, cantidad)
+			 VALUES ($1, $2, $3)`,
+			habitacionID, c.TipoCamaID, c.Cantidad,
+		); err != nil {
+			return nil, fmt.Errorf("crear cama (tipo %d) para habitacion %s: %w", c.TipoCamaID, habitacionID, err)
+		}
+	}
+
+	const sqlHab = `
+		SELECT h.id, h.establecimiento_id, h.nro_habitacion, h.piso,
+		       h.tipo_habitacion_id, th.nombre AS tipo_nombre,
+		       COALESCE(public.calcular_capacidad_habitacion(h.id), 0),
+		       h.estado_hab
+		FROM public.habitaciones h
+		LEFT JOIN public.tipo_habitaciones th ON th.id = h.tipo_habitacion_id
+		WHERE h.id = $1`
+
+	var h domain.HabitacionResponse
+	var tipoID *int
+	var estadoHab string
+	if err := tx.QueryRow(ctx, sqlHab, habitacionID).Scan(
+		&h.ID, &h.EstablecimientoID, &h.Numero, &h.Piso,
+		&tipoID, &h.TipoHabitacionNombre,
+		&h.CapacidadTotal, &estadoHab,
+	); err != nil {
+		return nil, fmt.Errorf("leer habitacion actualizada: %w", err)
+	}
+	if tipoID != nil {
+		s := fmt.Sprintf("%d", *tipoID)
+		h.TipoHabitacionID = &s
+	}
+	h.Activa = estadoHab == "DISPONIBLE" || estadoHab == "SERVICIO"
+
+	const sqlCamas = `
+		SELECT hc.id, hc.tipo_cama_id, tc.nombre, tc.capacidad_personas, hc.cantidad
+		FROM public.habitacion_camas hc
+		JOIN public.tipo_camas tc ON tc.id = hc.tipo_cama_id
+		WHERE hc.habitacion_id = $1`
+
+	rows, err := tx.Query(ctx, sqlCamas, habitacionID)
+	if err != nil {
+		return nil, fmt.Errorf("listar camas actualizadas: %w", err)
+	}
+	defer rows.Close()
+
+	var camas []domain.HabitacionCamaResponse
+	for rows.Next() {
+		var c domain.HabitacionCamaResponse
+		var tipoCamaID int
+		if err := rows.Scan(&c.ID, &tipoCamaID, &c.TipoCamaNombre, &c.CapacidadPersonas, &c.Cantidad); err != nil {
+			return nil, fmt.Errorf("scan cama actualizada: %w", err)
+		}
+		c.TipoCamaID = fmt.Sprintf("%d", tipoCamaID)
+		camas = append(camas, c)
+	}
+	if camas == nil {
+		camas = []domain.HabitacionCamaResponse{}
+	}
+	h.Camas = camas
+
+	return &h, nil
+}
+
 // ─── Catálogos ────────────────────────────────────────────────────────────────
 
 // ─── Personal ────────────────────────────────────────────────────────────────

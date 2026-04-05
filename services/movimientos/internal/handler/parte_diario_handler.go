@@ -106,7 +106,7 @@ func (h *ParteDiarioHandler) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
 		return
 	}
-	result, err := h.svc.Create(r.Context(), claims.Sub, r.RemoteAddr, claims.EstablecimientoID, req)
+	result, err := h.svc.Create(r.Context(), claims.Sub, claims.Username, claims.FirstName, claims.LastName, r.RemoteAddr, claims.EstablecimientoID, req)
 	if err != nil {
 		log.Error().Err(err).Str("sub", claims.Sub).Msg("Error al crear parte diario")
 		jsonError(w, http.StatusBadRequest, err.Error())
@@ -183,7 +183,7 @@ func (h *CierreDiarioHandler) Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
 		return
 	}
-	result, err := h.svc.CreateCierre(r.Context(), claims.Sub, claims.Sub, r.RemoteAddr, claims.EstablecimientoID, req)
+	result, err := h.svc.CreateCierre(r.Context(), claims.Sub, claims.Sub, claims.Username, claims.FirstName, claims.LastName, r.RemoteAddr, claims.EstablecimientoID, req)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

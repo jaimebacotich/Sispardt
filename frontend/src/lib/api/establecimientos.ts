@@ -51,6 +51,13 @@ export const establecimientosApi = {
       token
     ),
 
+  updateHabitacion: (token: string, id: string, habId: string, data: HabitacionCreate) =>
+    apiClient.put<Habitacion>(
+      `/api/v1/establecimientos/${id}/habitaciones/${habId}`,
+      data,
+      token
+    ),
+
   listCategorias: (token: string) =>
     apiClient.get<Categoria[]>("/api/v1/catalogos/categorias", token),
 

@@ -94,7 +94,6 @@ func (r *ReplicaRepo) UpsertHabitacion(ctx context.Context, rec *models.Habitaci
 			establecimiento_id  = EXCLUDED.establecimiento_id,
 			nro_habitacion      = EXCLUDED.nro_habitacion,
 			tipo_habitacion     = EXCLUDED.tipo_habitacion,
-			capacidad_calculada = EXCLUDED.capacidad_calculada,
 			estado_actual       = EXCLUDED.estado_actual,
 			piso                = EXCLUDED.piso,
 			eliminado_at        = EXCLUDED.eliminado_at,
