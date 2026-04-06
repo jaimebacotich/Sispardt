@@ -184,7 +184,9 @@ jobs:
 
       - name: Construir imagen Docker
         run: |
-          docker build \
+          # --load garantiza que la imagen queda en el daemon Docker local
+          # (necesario cuando BuildKit usa un builder no-docker, como buildx)
+          docker build --load \
             -t $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:${{ github.sha }} \
             -t $REGISTRY/${{ github.repository_owner }}/sispardt-${{ matrix.service }}:latest \
             ./${{ matrix.context }}
