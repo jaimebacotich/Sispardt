@@ -23,7 +23,7 @@
 #   APP_PASS_RECEP        Contraseña del usuario PostgreSQL app_recepcionista (movimientos)
 #   APP_PASS_ESTAD        Contraseña del usuario PostgreSQL app_resp_estadistica (movimientos)
 #   APP_PASS_ADMIN        Contraseña del usuario PostgreSQL app_admin_general (movimientos)
-#   APP_PASS_AUD_SES      Contraseña del usuario PostgreSQL app_auditoria_sesiones
+#   APP_PASS_AUD_SES      Contraseña del usuario PostgreSQL app_sistema (db-sistema)
 #   KC_SECRET_EST_SVC     Keycloak client secret — sispardt-establecimientos-svc
 #   KC_SECRET_MOV_SVC     Keycloak client secret — sispardt-movimientos-svc
 #   KC_SECRET_AUD_SVC     Keycloak client secret — sispardt-auditoria-sesiones-svc
@@ -233,7 +233,7 @@ jobs:
         # el step siguiente espera activamente y falla si no llega a healthy.
         run: |
           docker compose -f $GITHUB_WORKSPACE/docker-compose.yml up -d --remove-orphans \
-            db-establecimientos db-movimientos db-auditoria-sesiones db-keycloak keycloak keycloak-init \
+            db-establecimientos db-movimientos db-sistema db-keycloak keycloak keycloak-init \
             kafka debezium kafka-ui kafka-init svc-kafka-consumer \
             prometheus grafana node-exporter postgres-exporter-est postgres-exporter-mov \
             || true
@@ -242,7 +242,7 @@ jobs:
         run: |
           echo "Esperando que los servicios críticos estén healthy..."
           FAILED=0
-          for svc in sispardt-db-establecimientos sispardt-db-movimientos sispardt-db-auditoria-sesiones sispardt-keycloak; do
+          for svc in sispardt-db-establecimientos sispardt-db-movimientos sispardt-db-sistema sispardt-keycloak; do
             echo -n "  → $svc: "
             for i in $(seq 1 30); do
               STATUS=$(docker inspect --format='{{.State.Health.Status}}' $svc 2>/dev/null || echo "missing")
@@ -367,7 +367,7 @@ jobs:
           MOV_DSN="postgresql://app_recepcionista:${{ secrets.APP_PASS_RECEP }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           MOV_STATS_DSN="postgresql://app_resp_estadistica:${{ secrets.APP_PASS_ESTAD }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           KC_DSN="postgresql://app_admin_general:${{ secrets.APP_PASS_ADMIN }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
-          AUD_SES_DSN="postgresql://app_auditoria_sesiones:${{ secrets.APP_PASS_AUD_SES }}@db-auditoria-sesiones:5432/sispardt_auditoria_sesiones?sslmode=disable"
+          AUD_SES_DSN="postgresql://app_sistema:${{ secrets.APP_PASS_AUD_SES }}@db-sistema:5432/sispardt_sistema?sslmode=disable"
 
           kubectl create secret generic sispardt-secrets \
             --namespace=sispardt \
