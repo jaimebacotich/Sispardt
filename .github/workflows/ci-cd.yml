@@ -367,7 +367,7 @@ jobs:
           MOV_DSN="postgresql://app_recepcionista:${{ secrets.APP_PASS_RECEP }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           MOV_STATS_DSN="postgresql://app_resp_estadistica:${{ secrets.APP_PASS_ESTAD }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           KC_DSN="postgresql://app_admin_general:${{ secrets.APP_PASS_ADMIN }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
-          AUD_SES_DSN="postgresql://app_sistema:${{ secrets.APP_PASS_AUD_SES }}@db-sistema:5432/sispardt_sistema?sslmode=disable"
+          AUD_SES_DSN="postgresql://app_sistema:${{ secrets.APP_PASS_AUD_SES }}@db-auditoria-sesiones:5432/sispardt_sistema?sslmode=disable"
 
           kubectl create secret generic sispardt-secrets \
             --namespace=sispardt \

@@ -7,9 +7,10 @@
 #
 # ${NODE_IP} es sustituido por envsubst en el deploy workflow.
 #
-# Puertos del host (mapeados por Docker Compose):
-#   db-establecimientos → NODE_IP:5432
+# Puertos del host (mapeados por Docker Compose, ver PORT_DB_* en .env):
+#   db-establecimientos → NODE_IP:5436
 #   db-movimientos      → NODE_IP:5433
+#   db-auditoria-sesiones (=db-sistema) → NODE_IP:5435
 #   keycloak            → NODE_IP:8080
 #   kafka               → NODE_IP:9092
 # ============================================================
@@ -35,7 +36,7 @@ subsets:
       - ip: ${NODE_IP}
     ports:
       - name: pg
-        port: 5432
+        port: 5436
 
 ---
 # ─── db-movimientos ───────────────────────────────────────────────────────────
