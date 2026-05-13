@@ -326,6 +326,7 @@ create_service_client() {
 create_service_client "sispardt-establecimientos-svc"   "${KC_SECRET_EST_SVC:?Variable KC_SECRET_EST_SVC requerida}"
 create_service_client "sispardt-movimientos-svc"        "${KC_SECRET_MOV_SVC:?Variable KC_SECRET_MOV_SVC requerida}"
 create_service_client "sispardt-sistema-svc"            "${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}"
+create_service_client "sispardt-auditoria-sesiones-svc" "${KC_SECRET_AUD_SVC:?Variable KC_SECRET_AUD_SVC requerida}"
 
 # ---- 10b. Asignar manage-users al service account de sispardt-establecimientos-svc ----
 log "Asignando manage-users a sispardt-establecimientos-svc..."

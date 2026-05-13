@@ -90,3 +90,6 @@ frontend/build/
 frontend/dist/
 .next/
 node_modules/
+
+# Material de Defensa
+defensa/

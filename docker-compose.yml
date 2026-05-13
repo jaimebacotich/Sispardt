@@ -203,6 +203,7 @@ services:
       KC_SECRET_EST_SVC:          ${KC_SECRET_EST_SVC:?Variable KC_SECRET_EST_SVC requerida}
       KC_SECRET_MOV_SVC:          ${KC_SECRET_MOV_SVC:?Variable KC_SECRET_MOV_SVC requerida}
       KC_SECRET_SISTEMA_SVC:      ${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}
+      KC_SECRET_AUD_SVC:          ${KC_SECRET_AUD_SVC:?Variable KC_SECRET_AUD_SVC requerida}
       APP_HOST:                   ${APP_HOST:-localhost}
       APP_PORT:                ${APP_PORT:-3100}
     volumes:
