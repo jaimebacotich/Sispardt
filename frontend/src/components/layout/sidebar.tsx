@@ -24,6 +24,7 @@ import {
   Wifi,
   History,
   Users,
+  Printer,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 import { useEstablecimientoActual } from "@/hooks/useEstablecimientoActual";
@@ -122,6 +123,12 @@ const NAV_ENTRIES: NavEntry[] = [
     label: "Reporte Fuera de Plazo",
     href: "/reporte/fuera-de-plazo",
     icon: FileWarning,
+    roles: ["recepcionista"],
+  },
+  {
+    label: "Impresión de Partes",
+    href: "/partes/imprimir",
+    icon: Printer,
     roles: ["recepcionista"],
   },
   // ── Responsable Registro ─────────────────────────────────────────────────

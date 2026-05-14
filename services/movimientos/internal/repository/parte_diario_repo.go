@@ -1109,6 +1109,144 @@ func (r *ParteDiarioRepo) TiposHabitacion(ctx context.Context, estIDs []string, 
 	return results, rows.Err()
 }
 
+// ─── Reporte Parte Diario ─────────────────────────────────────────────────────
+
+const reporteParteSQL = `
+	SELECT
+		pd.hab_nro_snapshot,
+		pd.ingreso_at,
+		pd.salida_at,
+		pc.nombre,
+		pc.apellido_paterno,
+		pc.apellido_materno,
+		td.sigla          AS tipo_documento,
+		pc.documento_identidad,
+		pc.fecha_nacimiento,
+		pr.nombre         AS pais_origen,
+		pp.nombre         AS pais_procedencia
+	FROM public.partes_diarios pd
+	JOIN public.personas pc ON pc.id = pd.persona_id
+	JOIN public.tipos_documento td ON td.id = pc.tipo_documento_id
+	JOIN public.paises_replica_cache pr ON pr.id = pc.pais_origen_id
+	JOIN public.paises_replica_cache pp ON pp.id = pd.pais_procedencia_id
+	WHERE pd.establecimiento_id = $1
+	  AND pd.estado_operativo != 'ANULADO'
+	  AND pd.persona_id IS NOT NULL
+	  AND %s
+	ORDER BY %s`
+
+func (r *ParteDiarioRepo) GetReportePorFecha(
+	ctx context.Context,
+	establecimientoID string,
+	fecha string,
+) (ingresos []domain.ReporteFilaParteDiario, salidas []domain.ReporteFilaParteDiario, err error) {
+
+	ingresos = []domain.ReporteFilaParteDiario{}
+	salidas = []domain.ReporteFilaParteDiario{}
+
+	scanFila := func(rows pgx.Rows) (*domain.ReporteFilaParteDiario, error) {
+		var habNro *string
+		var ingresoAt time.Time
+		var salidaAt *time.Time
+		var nombre, apPat string
+		var apMat *string
+		var tipoDoc, nroDoc, paisOrigen, paisProcedencia string
+		var fechaNac *string
+
+		if err := rows.Scan(
+			&habNro, &ingresoAt, &salidaAt,
+			&nombre, &apPat, &apMat,
+			&tipoDoc, &nroDoc, &fechaNac,
+			&paisOrigen, &paisProcedencia,
+		); err != nil {
+			return nil, err
+		}
+
+		fila := &domain.ReporteFilaParteDiario{
+			Nombre:          nombre,
+			ApellidoPaterno: apPat,
+			TipoDocumento:   tipoDoc,
+			NroDocumento:    nroDoc,
+			Nacionalidad:    paisOrigen,
+			Procedencia:     paisProcedencia,
+			FechaIngreso:    ingresoAt.In(boliviaLoc()).Format("02/01/2006"),
+		}
+		if apMat != nil {
+			fila.ApellidoMaterno = *apMat
+		}
+		if fechaNac != nil && *fechaNac != "" {
+			if t, e := time.Parse("2006-01-02", *fechaNac); e == nil {
+				fila.FechaNacimiento = t.Format("02/01/2006")
+			}
+		}
+		if habNro != nil {
+			fila.NroPieza = *habNro
+		}
+		if salidaAt != nil {
+			fila.FechaSalida = salidaAt.In(boliviaLoc()).Format("02/01/2006")
+		}
+		return fila, nil
+	}
+
+	err = WithRLS(ctx, r.pool, establecimientoID, func(tx pgx.Tx) error {
+		// INGRESOS: fecha_reporte = fecha solicitada
+		ingresoQuery := fmt.Sprintf(reporteParteSQL,
+			"pd.fecha_reporte = $2",
+			"pd.ingreso_at ASC",
+		)
+		rows, qErr := tx.Query(ctx, ingresoQuery, establecimientoID, fecha)
+		if qErr != nil {
+			return fmt.Errorf("reporte ingresos: %w", qErr)
+		}
+		defer rows.Close()
+		i := 1
+		for rows.Next() {
+			fila, sErr := scanFila(rows)
+			if sErr != nil {
+				return fmt.Errorf("scan ingreso: %w", sErr)
+			}
+			fila.Numero = i
+			i++
+			ingresos = append(ingresos, *fila)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+
+		// SALIDAS: salida_at::date = fecha solicitada (hora Bolivia)
+		salidaQuery := fmt.Sprintf(reporteParteSQL,
+			"(pd.salida_at AT TIME ZONE 'America/La_Paz')::date = $2::date AND pd.salida_at IS NOT NULL",
+			"pd.salida_at ASC",
+		)
+		rows2, qErr := tx.Query(ctx, salidaQuery, establecimientoID, fecha)
+		if qErr != nil {
+			return fmt.Errorf("reporte salidas: %w", qErr)
+		}
+		defer rows2.Close()
+		j := 1
+		for rows2.Next() {
+			fila, sErr := scanFila(rows2)
+			if sErr != nil {
+				return fmt.Errorf("scan salida: %w", sErr)
+			}
+			fila.Numero = j
+			j++
+			salidas = append(salidas, *fila)
+		}
+		return rows2.Err()
+	})
+
+	return ingresos, salidas, err
+}
+
+func boliviaLoc() *time.Location {
+	loc, err := time.LoadLocation("America/La_Paz")
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
 // estIDsParam convierte una lista de establecimiento_ids a interface{} para pgx.
 // Retorna nil (NULL en SQL) cuando la lista está vacía, lo que hace que la cláusula
 // WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1,',')::uuid[]))

@@ -527,3 +527,28 @@ export interface AuditoriaTransaccion {
   valorNuevo: Record<string, unknown> | null;
   source?: "establecimientos" | "movimientos";
 }
+
+/* ============================================================
+ * Reportes — Parte Diario PDF
+ * ============================================================ */
+
+export interface ReporteFilaParteDiario {
+  numero: number;
+  fechaIngreso: string;    // DD/MM/YYYY
+  nombre: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  tipoDocumento: string;   // CI | DNI | PAS
+  nroDocumento: string;
+  fechaNacimiento: string; // DD/MM/YYYY
+  nacionalidad: string;
+  procedencia: string;
+  nroPieza: string;
+  fechaSalida: string;     // vacío para ingresos
+}
+
+export interface ReporteParteDiario {
+  fecha: string;           // DD/MM/YYYY
+  ingresos: ReporteFilaParteDiario[];
+  salidas: ReporteFilaParteDiario[];
+}

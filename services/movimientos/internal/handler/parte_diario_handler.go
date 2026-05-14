@@ -146,6 +146,27 @@ func (h *ParteDiarioHandler) Anular(w http.ResponseWriter, r *http.Request) {
 	jsonNoContent(w)
 }
 
+func (h *ParteDiarioHandler) Reporte(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	estID := claims.EstablecimientoID
+	if estID == "" {
+		jsonError(w, http.StatusForbidden, "recepcionista sin establecimiento asignado")
+		return
+	}
+	fecha := r.URL.Query().Get("fecha")
+	if fecha == "" {
+		jsonError(w, http.StatusBadRequest, "parámetro 'fecha' requerido (YYYY-MM-DD)")
+		return
+	}
+	result, err := h.svc.GetReportePorFecha(r.Context(), estID, fecha)
+	if err != nil {
+		log.Error().Err(err).Str("establecimiento_id", estID).Str("fecha", fecha).Msg("error al generar reporte")
+		jsonError(w, http.StatusInternalServerError, "error al generar reporte: "+err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
 func (h *ParteDiarioHandler) EstadoHabitaciones(w http.ResponseWriter, r *http.Request) {
 	claims := auth.FromContext(r.Context())
 	estID := claims.EstablecimientoID

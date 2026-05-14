@@ -75,6 +75,29 @@ func (s *ParteDiarioService) GetByID(ctx context.Context, id, establecimientoID 
 	return s.repo.GetByID(ctx, id, establecimientoID)
 }
 
+func (s *ParteDiarioService) GetReportePorFecha(ctx context.Context, establecimientoID, fecha string) (*domain.ReporteParteDiario, error) {
+	if establecimientoID == "" {
+		return nil, fmt.Errorf("establecimiento_id requerido")
+	}
+	if fecha == "" {
+		return nil, fmt.Errorf("fecha requerida")
+	}
+	ingresos, salidas, err := s.repo.GetReportePorFecha(ctx, establecimientoID, fecha)
+	if err != nil {
+		return nil, err
+	}
+	// Formatear fecha para el reporte: YYYY-MM-DD → DD/MM/YYYY
+	fechaDisplay := fecha
+	if t, e := time.Parse("2006-01-02", fecha); e == nil {
+		fechaDisplay = t.Format("02/01/2006")
+	}
+	return &domain.ReporteParteDiario{
+		Fecha:    fechaDisplay,
+		Ingresos: ingresos,
+		Salidas:  salidas,
+	}, nil
+}
+
 func (s *ParteDiarioService) Create(ctx context.Context, userID, username, firstName, lastName, clientIP, establecimientoID string, req domain.CreateParteDiarioRequest) (*domain.ParteDiarioResponse, error) {
 	if userID == "" {
 		return nil, fmt.Errorf("userID (sub) no encontrado en el token")

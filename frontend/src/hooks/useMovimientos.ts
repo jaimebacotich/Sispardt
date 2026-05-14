@@ -336,3 +336,15 @@ export function useTiposHabitacion(params: { establecimientoIds?: string[]; fech
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// ── Reporte Parte Diario ───────────────────────────────────────────────────
+export function useReportePartes(fecha: string | null) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: ["reporte-partes", fecha],
+    queryFn: () => movimientosApi.getReportePartes(accessToken!, fecha!),
+    enabled: !USE_MOCK && !!accessToken && !!fecha,
+    staleTime: 0,
+    retry: 1,
+  });
+}

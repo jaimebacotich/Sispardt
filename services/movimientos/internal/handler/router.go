@@ -60,12 +60,16 @@ func NewRouter(
 				auth.RoleResponsableEstadistica,
 			)).Get("/", parteHandler.List)
 
-			// estado-habitaciones ANTES de /{id} para no capturarlo como ID
+			// rutas literales ANTES de /{id} para que Chi no las capture como ID
 			r.With(auth.RequireRole(
 				auth.RoleRecepcionista,
 				auth.RoleResponsableRegistro,
 				auth.RoleAdminGeneral,
 			)).Get("/estado-habitaciones", parteHandler.EstadoHabitaciones)
+
+			r.With(auth.RequireRole(
+				auth.RoleRecepcionista,
+			)).Get("/reporte", parteHandler.Reporte)
 
 			r.With(auth.RequireRole(
 				auth.RoleRecepcionista,
