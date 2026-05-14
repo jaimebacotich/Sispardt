@@ -58,9 +58,27 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
+async function requestBlob(
+  path: string,
+  token?: string
+): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(`${BASE_URL}${path}`, { method: "GET", headers });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, { error: response.statusText });
+  }
+  return response.blob();
+}
+
 export const apiClient = {
   get: <T>(path: string, token?: string) =>
     request<T>(path, { method: "GET", token }),
+
+  getBlob: (path: string, token?: string) =>
+    requestBlob(path, token),
 
   post: <T>(path: string, body: unknown, token?: string) =>
     request<T>(path, {

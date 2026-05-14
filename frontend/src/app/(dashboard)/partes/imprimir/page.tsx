@@ -2,50 +2,63 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { FechaModal } from "./_components/FechaModal";
 import { PreviewModal } from "./_components/PreviewModal";
-import { useReportePartes } from "@/hooks/useMovimientos";
+import { useReportePDF } from "@/hooks/useMovimientos";
 import { useEstablecimientoActual } from "@/hooks/useEstablecimientoActual";
-import type { ReporteParteDiario } from "@/types/api";
 
 export default function ImprimirPartePage() {
   const router = useRouter();
-  const { nombre: nombreEstablecimiento } = useEstablecimientoActual();
+  const { nombre: nombreEstablecimiento, isLoading: loadingEstab } = useEstablecimientoActual();
 
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null);
-  const [reporte, setReporte] = useState<ReporteParteDiario | null>(null);
+  const [fechaRaw, setFechaRaw] = useState<string | null>(null);   // YYYY-MM-DD
+  const [pdfUrl, setPdfUrl]     = useState<string | null>(null);
 
-  const { data, isFetching, isError } = useReportePartes(fechaSeleccionada);
+  const { data: blobUrl, isFetching, isError } = useReportePDF(
+    fechaRaw,
+    nombreEstablecimiento ?? ""
+  );
 
+  // Cuando llega el blob URL, mostrar el preview
   useEffect(() => {
-    if (data && !isFetching) {
-      setReporte(data);
+    if (blobUrl && !isFetching) {
+      setPdfUrl(blobUrl);
     }
-  }, [data, isFetching]);
+  }, [blobUrl, isFetching]);
 
+  // Error al obtener el PDF
   useEffect(() => {
-    if (isError && fechaSeleccionada) {
+    if (isError && fechaRaw) {
       toast.error("No se pudo generar el reporte. Intenta nuevamente.");
-      setFechaSeleccionada(null);
+      setFechaRaw(null);
     }
-  }, [isError, fechaSeleccionada]);
+  }, [isError, fechaRaw]);
 
   function handleGenerar(fecha: string) {
-    setReporte(null);
-    setFechaSeleccionada(fecha);
+    // Liberar blob URL anterior si existe
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(null);
+    setFechaRaw(fecha);
   }
 
-  function handleCerrarPreview() {
-    setReporte(null);
-    setFechaSeleccionada(null);
+  function handleCerrar() {
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(null);
+    setFechaRaw(null);
     router.back();
   }
 
+  // Formatear fecha para mostrar: YYYY-MM-DD → DD/MM/YYYY
+  const fechaDisplay = fechaRaw
+    ? format(new Date(fechaRaw + "T12:00:00"), "dd/MM/yyyy")
+    : "";
+
   return (
     <>
-      {/* Overlay de carga mientras se obtienen los datos */}
-      {isFetching && (
+      {/* Spinner mientras carga el PDF */}
+      {(isFetching || loadingEstab) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl px-8 py-6 shadow-xl flex flex-col items-center gap-3">
             <div className="h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -55,16 +68,18 @@ export default function ImprimirPartePage() {
       )}
 
       {/* Modal selector de fecha */}
-      {!reporte && !isFetching && (
+      {!pdfUrl && !isFetching && (
         <FechaModal onGenerar={handleGenerar} />
       )}
 
-      {/* Modal de preview PDF */}
-      {reporte && (
+      {/* Preview del PDF */}
+      {pdfUrl && fechaRaw && (
         <PreviewModal
-          data={reporte}
+          pdfUrl={pdfUrl}
+          fecha={fechaDisplay}
+          fechaRaw={fechaRaw}
           nombreEstablecimiento={nombreEstablecimiento ?? "Establecimiento"}
-          onCerrar={handleCerrarPreview}
+          onCerrar={handleCerrar}
         />
       )}
     </>

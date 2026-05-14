@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"sispardt/movimientos/internal/auth"
 	"sispardt/movimientos/internal/domain"
+	"sispardt/movimientos/internal/pdf"
 	"sispardt/movimientos/internal/repository"
 	"sispardt/movimientos/internal/service"
 )
@@ -158,13 +160,22 @@ func (h *ParteDiarioHandler) Reporte(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "parámetro 'fecha' requerido (YYYY-MM-DD)")
 		return
 	}
-	result, err := h.svc.GetReportePorFecha(r.Context(), estID, fecha)
+	nombreEstablecimiento := r.URL.Query().Get("nombre")
+
+	reporte, err := h.svc.GetReportePorFecha(r.Context(), estID, fecha)
 	if err != nil {
 		log.Error().Err(err).Str("establecimiento_id", estID).Str("fecha", fecha).Msg("error al generar reporte")
 		jsonError(w, http.StatusInternalServerError, "error al generar reporte: "+err.Error())
 		return
 	}
-	jsonOK(w, result)
+
+	nombreArchivo := fmt.Sprintf("parte-diario-%s.pdf", fecha)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, nombreArchivo))
+
+	if err := pdf.GenerarParteDiario(w, reporte, nombreEstablecimiento); err != nil {
+		log.Error().Err(err).Msg("error al escribir PDF")
+	}
 }
 
 func (h *ParteDiarioHandler) EstadoHabitaciones(w http.ResponseWriter, r *http.Request) {

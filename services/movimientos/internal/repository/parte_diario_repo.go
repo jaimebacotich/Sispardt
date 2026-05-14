@@ -1119,14 +1119,14 @@ const reporteParteSQL = `
 		pc.nombre,
 		pc.apellido_paterno,
 		pc.apellido_materno,
-		td.sigla          AS tipo_documento,
+		COALESCE(td.sigla, '')          AS tipo_documento,
 		pc.documento_identidad,
-		pc.fecha_nacimiento,
-		pr.nombre         AS pais_origen,
-		pp.nombre         AS pais_procedencia
+		pc.fecha_nacimiento::text,
+		pr.nombre                        AS pais_origen,
+		pp.nombre                        AS pais_procedencia
 	FROM public.partes_diarios pd
 	JOIN public.personas pc ON pc.id = pd.persona_id
-	JOIN public.tipos_documento td ON td.id = pc.tipo_documento_id
+	LEFT JOIN public.tipos_documento td ON td.id = pc.tipo_documento_id
 	JOIN public.paises_replica_cache pr ON pr.id = pc.pais_origen_id
 	JOIN public.paises_replica_cache pp ON pp.id = pd.pais_procedencia_id
 	WHERE pd.establecimiento_id = $1

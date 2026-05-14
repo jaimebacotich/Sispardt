@@ -12,7 +12,6 @@ import type {
   TipoHabitacionStat,
   PagedResult,
   CatalogosMovimientos,
-  ReporteParteDiario,
 } from "@/types/api";
 
 export const movimientosApi = {
@@ -138,7 +137,10 @@ export const movimientosApi = {
     return apiClient.get<TipoHabitacionStat[]>(`/api/v1/estadisticas/tipos-habitacion?${q}`, token);
   },
 
-  // ── Reporte Parte Diario ─────────────────────────────────
-  getReportePartes: (token: string, fecha: string) =>
-    apiClient.get<ReporteParteDiario>(`/api/v1/partes/reporte?fecha=${fecha}`, token),
+  // ── Reporte Parte Diario (PDF binario) ───────────────────
+  getReportePDF: (token: string, fecha: string, nombre: string) =>
+    apiClient.getBlob(
+      `/api/v1/partes/reporte?fecha=${fecha}&nombre=${encodeURIComponent(nombre)}`,
+      token
+    ),
 };

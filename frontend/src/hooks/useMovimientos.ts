@@ -337,14 +337,18 @@ export function useTiposHabitacion(params: { establecimientoIds?: string[]; fech
   });
 }
 
-// ── Reporte Parte Diario ───────────────────────────────────────────────────
-export function useReportePartes(fecha: string | null) {
+// ── Reporte Parte Diario PDF ───────────────────────────────────────────────
+export function useReportePDF(fecha: string | null, nombreEstablecimiento: string) {
   const { accessToken } = useAuth();
   return useQuery({
-    queryKey: ["reporte-partes", fecha],
-    queryFn: () => movimientosApi.getReportePartes(accessToken!, fecha!),
-    enabled: !USE_MOCK && !!accessToken && !!fecha,
+    queryKey: ["reporte-pdf", fecha],
+    queryFn: async () => {
+      const blob = await movimientosApi.getReportePDF(accessToken!, fecha!, nombreEstablecimiento);
+      return URL.createObjectURL(blob);
+    },
+    enabled: !USE_MOCK && !!accessToken && !!fecha && !!nombreEstablecimiento,
     staleTime: 0,
     retry: 1,
+    gcTime: 0,
   });
 }
