@@ -14,13 +14,18 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar fijo */}
-      <Sidebar />
+      {/* Sidebar fijo — oculto en impresión */}
+      <div className="print:hidden">
+        <Sidebar />
+      </div>
 
       {/* Contenido principal */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">
+        {/* Header — oculto en impresión */}
+        <div className="print:hidden">
+          <Header />
+        </div>
+        <main className="flex-1 overflow-y-auto p-6 print:overflow-visible print:p-0">
           {children}
         </main>
       </div>

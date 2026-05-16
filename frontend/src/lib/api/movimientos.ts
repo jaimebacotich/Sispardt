@@ -138,9 +138,91 @@ export const movimientosApi = {
   },
 
   // ── Reporte Parte Diario (PDF binario) ───────────────────
-  getReportePDF: (token: string, fecha: string, nombre: string) =>
+  getReportePDF: (
+    token: string,
+    fecha: string,
+    nombre: string,
+    clasificacion: string,
+    categoria: string,
+    direccion: string,
+    telefono: string,
+    establecimientoId?: string   // solo para responsable_registro
+  ) => {
+    const q = new URLSearchParams({ fecha });
+    if (establecimientoId) q.set("establecimiento_id", establecimientoId);
+    q.set("nombre",        nombre);
+    q.set("clasificacion", clasificacion);
+    q.set("categoria",     categoria);
+    q.set("direccion",     direccion);
+    q.set("telefono",      telefono);
+    return apiClient.getBlob(`/api/v1/partes/reporte?${q}`, token);
+  },
+
+  // ── Reporte Consolidado Nacional (PDF binario) ────────────
+  getReporteMunicipioInternacionalPDF: (
+    token: string,
+    body: {
+      municipio: string;
+      anio: number;
+      mes: number;
+      establecimientos: { id: string; nombre: string; clasificacion: string; categoria: string }[];
+    }
+  ) =>
+    fetch("/api/v1/partes/reporte-municipio-internacional", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }).then((res) => {
+      if (!res.ok) throw new Error("Error al generar reporte municipio internacional");
+      return res.blob();
+    }),
+
+  getReporteMunicipioNacionalPDF: (
+    token: string,
+    body: {
+      municipio: string;
+      anio: number;
+      mes: number;
+      establecimientos: { id: string; nombre: string; clasificacion: string; categoria: string }[];
+    }
+  ) => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+    return fetch("/api/v1/partes/reporte-municipio-nacional", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }).then((res) => {
+      if (!res.ok) throw new Error("Error al generar reporte municipio");
+      return res.blob();
+    });
+  },
+
+  getReporteInternacionalPDF: (
+    token: string,
+    establecimientoId: string,
+    anio: number,
+    mes: number,
+    nombre: string,
+    municipio: string
+  ) =>
     apiClient.getBlob(
-      `/api/v1/partes/reporte?fecha=${fecha}&nombre=${encodeURIComponent(nombre)}`,
+      `/api/v1/partes/reporte-internacional?establecimiento_id=${establecimientoId}&anio=${anio}&mes=${mes}&nombre=${encodeURIComponent(nombre)}&municipio=${encodeURIComponent(municipio)}`,
+      token
+    ),
+
+  getReporteNacionalPDF: (
+    token: string,
+    establecimientoId: string,
+    anio: number,
+    mes: number,
+    nombre: string,
+    municipio: string
+  ) =>
+    apiClient.getBlob(
+      `/api/v1/partes/reporte-nacional?establecimiento_id=${establecimientoId}&anio=${anio}&mes=${mes}&nombre=${encodeURIComponent(nombre)}&municipio=${encodeURIComponent(municipio)}`,
       token
     ),
 };

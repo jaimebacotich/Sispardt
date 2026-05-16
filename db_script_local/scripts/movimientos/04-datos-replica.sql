@@ -1,64 +1,77 @@
 -- ============================================
 -- SISPARDT - BD Movimientos
--- 04: Datos de Replica Cache (manual, hasta que Debezium sincronice)
+-- 04: Datos de Replica Cache (seed inicial)
+-- IDs alineados con BD establecimientos
 -- ============================================
 
--- Replica de paises (solo los necesarios para procedencia)
+-- ── Países ────────────────────────────────────────────────────────────────────
 INSERT INTO public.paises_replica_cache (id, nombre, codigo_iso, es_sistema) VALUES
-(1, 'Bolivia', 'BOL', true);
+(1, 'Bolivia',        'BOL', true),
+(2, 'Argentina',      'ARG', false),
+(3, 'Brasil',         'BRA', false),
+(4, 'Chile',          'CHL', false),
+(5, 'Colombia',       'COL', false),
+(6, 'Ecuador',        'ECU', false),
+(7, 'Paraguay',       'PRY', false),
+(8, 'Peru',           'PER', false),
+(9, 'Uruguay',        'URY', false),
+(10,'Venezuela',      'VEN', false),
+(11,'Estados Unidos', 'USA', false),
+(12,'España',         'ESP', false),
+(13,'Francia',        'FRA', false),
+(14,'Alemania',       'DEU', false),
+(15,'Reino Unido',    'GBR', false),
+(16,'Italia',         'ITA', false),
+(17,'Canada',         'CAN', false),
+(18,'Mexico',         'MEX', false),
+(19,'Japon',          'JPN', false),
+(20,'China',          'CHN', false),
+(21,'Australia',      'AUS', false),
+(22,'Israel',         'ISR', false),
+(23,'Paises Bajos',   'NLD', false),
+(24,'Suiza',          'CHE', false),
+(25,'Suecia',         'SWE', false),
+(26,'Corea del Sur',  'KOR', false)
+ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, codigo_iso = EXCLUDED.codigo_iso;
 
--- Paises adicionales comunes (para procedencia de huespedes)
-INSERT INTO public.paises_replica_cache (id, nombre, codigo_iso) VALUES
-(2, 'Argentina', 'ARG'),
-(3, 'Brasil', 'BRA'),
-(4, 'Chile', 'CHL'),
-(5, 'Colombia', 'COL'),
-(6, 'Ecuador', 'ECU'),
-(7, 'Paraguay', 'PRY'),
-(8, 'Peru', 'PER'),
-(9, 'Uruguay', 'URY'),
-(10, 'Venezuela', 'VEN'),
-(11, 'Estados Unidos', 'USA'),
-(12, 'Espana', 'ESP'),
-(13, 'Francia', 'FRA'),
-(14, 'Alemania', 'DEU'),
-(15, 'Reino Unido', 'GBR'),
-(16, 'Italia', 'ITA'),
-(17, 'Canada', 'CAN'),
-(18, 'Mexico', 'MEX'),
-(19, 'Japon', 'JPN'),
-(20, 'China', 'CHN'),
-(21, 'Australia', 'AUS'),
-(22, 'Israel', 'ISR'),
-(23, 'Paises Bajos', 'NLD'),
-(24, 'Suiza', 'CHE'),
-(25, 'Suecia', 'SWE'),
-(26, 'Corea del Sur', 'KOR');
-
-
--- Replica de divisiones principales
+-- ── Departamentos de Bolivia (9) ──────────────────────────────────────────────
+-- IDs extraídos de BD establecimientos (divisiones_principales)
 INSERT INTO public.divisiones_principales_replica_cache (id, pais_id, nombre, es_sistema) VALUES
-(1, 1, 'Tarija', true);
+(1, 1, 'Cochabamba', true),
+(2, 1, 'La Paz',     true),
+(3, 1, 'Oruro',      true),
+(4, 1, 'Chuquisaca', true),
+(5, 1, 'Santa Cruz', true),
+(6, 1, 'Tarija',     true),
+(7, 1, 'Beni',       true),
+(8, 1, 'Pando',      true),
+(9, 1, 'Potosí',     true)
+ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre;
 
--- Replica de divisiones secundarias
+-- ── Provincias de Tarija (6) ───────────────────────────────────────────────────
 INSERT INTO public.divisiones_secundarias_replica_cache (id, division_principal_id, nombre, es_sistema) VALUES
-(1, 1, 'Cercado', true),
-(2, 1, 'Arce', true),
-(3, 1, 'Gran Chaco', true),
-(4, 1, 'Aviles', true),
-(5, 1, 'Mendez', true),
-(6, 1, 'O''Connor', true);
+(79, 6, 'Cercado',          true),
+(80, 6, 'Arce',             true),
+(81, 6, 'Gran Chaco',       true),
+(82, 6, 'O''Connor',        true),
+(83, 6, 'Avilés',           true),
+(84, 6, 'Eustaquio Méndez', true)
+ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre;
 
--- Replica de localidades
+-- ── Municipios de Tarija (11) ─────────────────────────────────────────────────
 INSERT INTO public.localidades_replica_cache (id, division_secundaria_id, nombre, es_sistema) VALUES
-(1, 1, 'Tarija', true),
-(2, 2, 'Padcaya', true),
-(3, 2, 'Bermejo', true),
-(4, 3, 'Yacuiba', true),
-(5, 3, 'Villamontes', true),
-(6, 3, 'Carapari', true),
-(7, 4, 'Uriondo', true),
-(8, 4, 'Yunchar', true),
-(9, 5, 'San Lorenzo', true),
-(10, 5, 'El Puente', true),
-(11, 6, 'Entre Rios', true);
+(217, 79, 'Tarija',       true),
+(218, 80, 'Bermejo',      true),
+(219, 81, 'Yacuiba',      true),
+(220, 81, 'Villa Montes', true),
+(221, 81, 'Caraparí',     true),
+(222, 82, 'Entre Ríos',   true),
+(223, 83, 'Uriondo',      true),
+(224, 83, 'Padcaya',      true),
+(225, 83, 'Yunchará',     true),
+(226, 84, 'San Lorenzo',  true),
+(227, 84, 'El Puente',    true)
+ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre;
+
+-- Nota: el resto de departamentos, provincias y municipios es replicado
+-- automáticamente por el kafka-consumer al arrancar el sistema.

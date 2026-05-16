@@ -3,165 +3,210 @@ package pdf
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/go-pdf/fpdf"
 	"sispardt/movimientos/internal/domain"
 )
 
-// columna define el encabezado y ancho (en mm) de cada columna del reporte.
-type columna struct {
-	header string
-	width  float64
+// InfoEstablecimiento agrupa los datos del hotel para el encabezado del PDF.
+type InfoEstablecimiento struct {
+	Nombre        string
+	Clasificacion string
+	Categoria     string
+	Direccion     string
+	Telefono      string
 }
 
-var columnas = []columna{
-	{"N°", 7},
-	{"Fecha Ing.", 19},
-	{"Nombre", 23},
-	{"Ap. Paterno", 23},
-	{"Ap. Materno", 21},
-	{"Tipo Doc.", 15},
-	{"N° Documento", 23},
-	{"Fecha Nac.", 19},
-	{"Nacionalidad", 26},
-	{"Procedencia", 26},
-	{"Nro. Pieza", 18},
-	{"Fecha Sal.", 19},
-}
-
+// Hoja Carta landscape: 279.4 × 215.9 mm → usamos 279 × 216
+// Márgenes: 8mm c/lado → ancho útil 263mm | alto útil ≈ 196mm
+//
+// Distribución de columnas (total ≈ 255mm):
+//  N°(6) FIng(18) Nombre(38) APat(32) AMat(29) Tipo(12) NDoc(22) FNac(17) Nac(25) Proc(24) Pieza(13) FSal(19)
 const (
-	marginH     = 10.0
-	rowHeight   = 5.5
-	headerH     = 6.0
-	fontSize    = 7.0
-	fontSizeSm  = 6.5
+	marginPD = 8.0
+
+	colN       = 6.0
+	colFIng    = 18.0
+	colNombre  = 38.0
+	colAPat    = 32.0
+	colAMat    = 29.0
+	colTipo    = 12.0
+	colNDoc    = 22.0
+	colFNac    = 17.0
+	colNac     = 25.0
+	colProc    = 24.0
+	colPieza   = 13.0
+	colFSal    = 19.0
+
+	rowHPD  = 6.0  // altura cabecera tabla
+	rowDPD  = 5.5  // altura filas datos
+	fszPD   = 7.0  // fuente datos
+	fszHPD  = 6.5  // fuente cabecera tabla
 )
 
-// GenerarParteDiario escribe un PDF A4 landscape en w con los datos del reporte.
-func GenerarParteDiario(w io.Writer, reporte *domain.ReporteParteDiario, nombreEstablecimiento string) error {
+type colDef struct {
+	header string
+	width  float64
+	align  string
+}
+
+var columnasPartes = []colDef{
+	{"N°",       colN,      "C"},
+	{"F. Ing.",  colFIng,   "C"},
+	{"Nombre",   colNombre, "L"},
+	{"Ap. Pat.", colAPat,   "L"},
+	{"Ap. Mat.", colAMat,   "L"},
+	{"Tipo",     colTipo,   "C"},
+	{"N° Doc.",  colNDoc,   "C"},
+	{"F. Nac.",  colFNac,   "C"},
+	{"Nacion.",  colNac,    "L"},
+	{"Proced.",  colProc,   "L"},
+	{"Pieza",    colPieza,  "C"},
+	{"F. Sal.",  colFSal,   "C"},
+}
+
+func anchoTotalPartes() float64 {
+	t := 0.0
+	for _, c := range columnasPartes {
+		t += c.width
+	}
+	return t
+}
+
+func GenerarParteDiario(w io.Writer, reporte *domain.ReporteParteDiario, info InfoEstablecimiento) error {
 	pdf := fpdf.NewCustom(&fpdf.InitType{
 		OrientationStr: "L",
 		UnitStr:        "mm",
-		SizeStr:        "A4",
+		SizeStr:        "Letter", // hoja carta 279×216mm
 		FontDirStr:     "",
 	})
+	cargarFuentes(pdf)
 
-	pdf.SetMargins(marginH, 12, marginH)
-	pdf.SetAutoPageBreak(true, 15)
+	pdf.SetMargins(marginPD, 8, marginPD)
+	pdf.SetAutoPageBreak(true, 12)
 	pdf.AliasNbPages("{nb}")
 
 	pdf.SetFooterFunc(func() {
-		pdf.SetY(-12)
-		pdf.SetFont("Helvetica", "I", 6.5)
-		pdf.SetTextColor(100, 100, 100)
-		pdf.CellFormat(0, 5, "Sistema de Partes Diarios Tarija - SISPARDT", "", 0, "L", false, 0, "")
 		pageW, _ := pdf.GetPageSize()
-		pdf.SetX(marginH)
-		pdf.CellFormat(pageW-marginH*2, 5,
+		pdf.SetY(-10)
+		pdf.SetFont("DejaVu", "I", 6.0)
+		pdf.SetTextColor(100, 100, 100)
+		pdf.CellFormat(pageW-marginPD*2, 4,
+			"Sistema de Partes Diarios Tarija - SISPARDT", "", 0, "L", false, 0, "")
+		pdf.SetX(marginPD)
+		pdf.CellFormat(pageW-marginPD*2, 4,
 			fmt.Sprintf("Página %d de {nb}", pdf.PageNo()), "", 0, "R", false, 0, "")
 	})
 
 	pdf.AddPage()
 
-	// ── Cabecera ───────────────────────────────────────────────────────────────
-	pdf.SetFont("Helvetica", "B", 13)
+	// ── Nombre del establecimiento ────────────────────────────────────────────
+	pdf.SetFont("DejaVu", "B", 15)
 	pdf.SetTextColor(0, 0, 0)
-	pdf.CellFormat(0, 7, nombreEstablecimiento, "", 1, "C", false, 0, "")
+	pdf.CellFormat(0, 8, info.Nombre, "", 1, "C", false, 0, "")
 
-	pdf.SetFont("Helvetica", "", 9)
+	pdf.SetFont("DejaVu", "", 8.5)
 	pdf.CellFormat(0, 5, "Reporte de Parte Diario", "", 1, "C", false, 0, "")
-	pdf.Ln(3)
-
-	pdf.SetFont("Helvetica", "", 8)
-	pdf.CellFormat(0, 5, "Fecha: "+reporte.Fecha, "", 1, "L", false, 0, "")
 	pdf.Ln(2)
 
-	// ── Sección Ingresos ───────────────────────────────────────────────────────
-	pdf.SetFont("Helvetica", "B", 8)
+	// ── Datos del establecimiento en una línea ────────────────────────────────
+	pdf.SetFont("DejaVu", "", 7.0)
+	pdf.SetTextColor(60, 60, 60)
+
+	partes := []string{}
+	if info.Clasificacion != "" {
+		partes = append(partes, "Clasif.: "+info.Clasificacion)
+	}
+	if info.Categoria != "" {
+		partes = append(partes, "Categ.: "+info.Categoria)
+	}
+	if info.Direccion != "" {
+		partes = append(partes, "Dir.: "+info.Direccion)
+	}
+	if info.Telefono != "" {
+		partes = append(partes, "Tel.: "+info.Telefono)
+	}
+	if len(partes) > 0 {
+		pdf.CellFormat(0, 4.5, strings.Join(partes, "   |   "), "", 1, "L", false, 0, "")
+	}
+
+	// ── Fecha de reporte ──────────────────────────────────────────────────────
+	pdf.SetFont("DejaVu", "", 7.5)
+	pdf.SetTextColor(0, 0, 0)
+	pdf.CellFormat(0, 4.5, "Fecha de reporte: "+reporte.Fecha, "", 1, "L", false, 0, "")
+	pdf.Ln(2)
+
+	// ── Ingresos ───────────────────────────────────────────────────────────────
+	pdf.SetFont("DejaVu", "B", 8)
 	pdf.CellFormat(0, 5, "INGRESOS:", "", 1, "L", false, 0, "")
 	pdf.Ln(1)
-	dibujarTabla(pdf, reporte.Ingresos)
-	pdf.Ln(5)
+	dibujarTablaPartes(pdf, reporte.Ingresos)
+	pdf.Ln(4)
 
-	// ── Sección Salidas ────────────────────────────────────────────────────────
-	pdf.SetFont("Helvetica", "B", 8)
+	// ── Salidas ────────────────────────────────────────────────────────────────
+	pdf.SetFont("DejaVu", "B", 8)
 	pdf.CellFormat(0, 5, "SALIDAS:", "", 1, "L", false, 0, "")
 	pdf.Ln(1)
-	dibujarTabla(pdf, reporte.Salidas)
+	dibujarTablaPartes(pdf, reporte.Salidas)
 
 	return pdf.Output(w)
 }
 
-func dibujarTabla(pdf *fpdf.Fpdf, filas []domain.ReporteFilaParteDiario) {
-	// Cabecera de la tabla
-	pdf.SetFont("Helvetica", "B", fontSizeSm)
-	pdf.SetFillColor(224, 224, 224)
+func dibujarTablaPartes(pdf *fpdf.Fpdf, filas []domain.ReporteFilaParteDiario) {
+	// Cabecera
+	pdf.SetFont("DejaVu", "B", fszHPD)
+	pdf.SetFillColor(210, 210, 210)
 	pdf.SetTextColor(0, 0, 0)
-	pdf.SetDrawColor(160, 160, 160)
+	pdf.SetDrawColor(150, 150, 150)
 	pdf.SetLineWidth(0.2)
 
-	for _, col := range columnas {
-		pdf.CellFormat(col.width, headerH, col.header, "1", 0, "C", true, 0, "")
+	for _, col := range columnasPartes {
+		pdf.CellFormat(col.width, rowHPD, col.header, "1", 0, "C", true, 0, "")
 	}
 	pdf.Ln(-1)
 
 	if len(filas) == 0 {
-		pdf.SetFont("Helvetica", "I", fontSize)
+		pdf.SetFont("DejaVu", "I", fszPD)
 		pdf.SetFillColor(255, 255, 255)
-		anchoTotal := anchoTabla()
-		pdf.CellFormat(anchoTotal, rowHeight, "Sin registros para esta fecha.", "1", 1, "C", false, 0, "")
+		pdf.CellFormat(anchoTotalPartes(), rowDPD, "Sin registros para esta fecha.", "1", 1, "C", false, 0, "")
 		return
 	}
 
-	pdf.SetFont("Helvetica", "", fontSizeSm)
+	pdf.SetFont("DejaVu", "", fszPD)
 	for i, fila := range filas {
-		// Filas alternas
 		if i%2 == 0 {
 			pdf.SetFillColor(255, 255, 255)
 		} else {
-			pdf.SetFillColor(248, 248, 248)
+			pdf.SetFillColor(245, 245, 245)
 		}
 
 		valores := []string{
 			fmt.Sprintf("%d", fila.Numero),
 			fila.FechaIngreso,
-			truncar(fila.Nombre, 14),
-			truncar(fila.ApellidoPaterno, 14),
-			truncar(fila.ApellidoMaterno, 13),
+			truncar(fila.Nombre, 18),
+			truncar(fila.ApellidoPaterno, 16),
+			truncar(fila.ApellidoMaterno, 14),
 			fila.TipoDocumento,
 			fila.NroDocumento,
 			fila.FechaNacimiento,
-			truncar(fila.Nacionalidad, 15),
-			truncar(fila.Procedencia, 15),
+			truncar(fila.Nacionalidad, 13),
+			truncar(fila.Procedencia, 12),
 			fila.NroPieza,
 			fila.FechaSalida,
 		}
 
-		for j, col := range columnas {
-			align := "L"
-			if j == 0 {
-				align = "C"
-			}
-			pdf.CellFormat(col.width, rowHeight, valores[j], "1", 0, align, true, 0, "")
+		for j, col := range columnasPartes {
+			pdf.CellFormat(col.width, rowDPD, valores[j], "1", 0, col.align, true, 0, "")
 		}
 		pdf.Ln(-1)
 	}
 }
 
-func anchoTabla() float64 {
-	total := 0.0
-	for _, c := range columnas {
-		total += c.width
-	}
-	return total
-}
-
-// truncar recorta el texto si excede el máximo de caracteres para evitar
-// que desborde la celda de la tabla.
 func truncar(s string, max int) string {
 	runes := []rune(s)
 	if len(runes) <= max {
 		return s
 	}
-	return string(runes[:max-1]) + "…"
+	return string(runes[:max-1]) + "."
 }

@@ -117,3 +117,23 @@
     background-color: rgba(100, 116, 139, 0.4);
   }
 }
+
+/* ── Print styles para Estadísticas ───────────────────────────── */
+@media print {
+  /* Forzar colores exactos (fondos, gráficos SVG) */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Evitar cortes dentro de las tarjetas y gráficos */
+  .bg-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+}

@@ -159,9 +159,15 @@ export function EstadisticasDashboard() {
     ahora.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* ── Filtros maestros ─────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
+    <div id="estadisticas-contenido" className="space-y-5 animate-fade-in">
+      {/* ── Encabezado solo visible en impresión / exportación PDF ── */}
+      <div className="hidden print:block mb-4 border-b pb-3">
+        <p className="text-lg font-bold text-center">Sistema de Partes Diarios Tarija — SISPARDT</p>
+        <p className="text-sm text-center text-gray-600">Estadísticas Generales · {actualizado}</p>
+      </div>
+
+      {/* ── Filtros maestros — ocultos en impresión ──────────────── */}
+      <div className="print:hidden flex flex-wrap items-center gap-3">
 
         {/* Localidad — solo para roles no-recepcionista */}
         {!isRecepcionista && (
@@ -212,8 +218,8 @@ export function EstadisticasDashboard() {
         </span>
       </div>
 
-      {/* ── Selector de período ──────────────────────────────────── */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Selector de período — oculto en impresión ───────────── */}
+      <div className="print:hidden flex items-center gap-2 flex-wrap">
         {PERIODO_OPTS.map(({ key, label }) => (
           <button
             key={key}

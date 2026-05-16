@@ -69,7 +69,28 @@ func NewRouter(
 
 			r.With(auth.RequireRole(
 				auth.RoleRecepcionista,
+				auth.RoleResponsableRegistro,
 			)).Get("/reporte", parteHandler.Reporte)
+
+			r.With(auth.RequireRole(
+				auth.RoleResponsableRegistro,
+				auth.RoleAdminGeneral,
+			)).Get("/reporte-nacional", parteHandler.ReporteNacional)
+
+			r.With(auth.RequireRole(
+				auth.RoleResponsableRegistro,
+				auth.RoleAdminGeneral,
+			)).Get("/reporte-internacional", parteHandler.ReporteInternacional)
+
+			r.With(auth.RequireRole(
+				auth.RoleResponsableRegistro,
+				auth.RoleAdminGeneral,
+			)).Post("/reporte-municipio-nacional", parteHandler.ReporteMunicipioNacional)
+
+			r.With(auth.RequireRole(
+				auth.RoleResponsableRegistro,
+				auth.RoleAdminGeneral,
+			)).Post("/reporte-municipio-internacional", parteHandler.ReporteMunicipioInternacional)
 
 			r.With(auth.RequireRole(
 				auth.RoleRecepcionista,

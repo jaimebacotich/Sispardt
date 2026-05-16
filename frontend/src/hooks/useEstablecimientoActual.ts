@@ -13,11 +13,15 @@ export function useEstablecimientoActual() {
   const query = useEstablecimiento(id);
 
   if (!isRecepcionista || !establecimientoId) {
-    return { nombre: null, isLoading: false };
+    return { nombre: null, clasificacion: null, categoria: null, direccion: null, telefono: null, isLoading: false };
   }
 
   return {
-    nombre: query.data?.razonSocial ?? null,
-    isLoading: query.isLoading,
+    nombre:        query.data?.razonSocial         ?? null,
+    clasificacion: query.data?.clasificacionNombre  ?? null,
+    categoria:     query.data?.categoriaNombre      ?? null,
+    direccion:     query.data?.direccion            ?? null,
+    telefono:      query.data?.telefono             ?? null,
+    isLoading:     query.isLoading,
   };
 }

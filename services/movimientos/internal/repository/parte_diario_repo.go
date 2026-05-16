@@ -1247,6 +1247,194 @@ func boliviaLoc() *time.Location {
 	return loc
 }
 
+// ─── Reporte Consolidado Nacional ─────────────────────────────────────────────
+
+// GetReporteNacional devuelve todos los partes nacionales (Bolivia) de un mes
+// para un establecimiento, con el nombre del departamento de procedencia.
+// El cálculo de la matriz día × departamento se hace en Go para mantener la
+// query simple y evitar SQL complejo de 31 × 9 celdas.
+func (r *ParteDiarioRepo) GetReporteNacional(
+	ctx context.Context,
+	establecimientoID string,
+	anio, mes int,
+) ([]domain.ParteParaReporte, error) {
+
+	const sql = `
+		SELECT
+			EXTRACT(DAY FROM pd.fecha_reporte)::int           AS dia,
+			EXTRACT(EPOCH FROM pd.ingreso_at)::bigint         AS ingreso_ts,
+			CASE WHEN pd.salida_at IS NOT NULL
+			     THEN EXTRACT(EPOCH FROM pd.salida_at)::bigint
+			     ELSE NULL END                                AS salida_ts,
+			COALESCE(dp.nombre, 'Sin datos')                  AS departamento
+		FROM public.partes_diarios pd
+		LEFT JOIN public.localidades_replica_cache          lc ON lc.id = pd.localidad_procedencia_id
+		LEFT JOIN public.divisiones_secundarias_replica_cache ds ON ds.id = lc.division_secundaria_id
+		LEFT JOIN public.divisiones_principales_replica_cache dp ON dp.id = ds.division_principal_id
+		WHERE pd.establecimiento_id = $1
+		  AND pd.estado_operativo   = 'ACTIVO'
+		  AND EXTRACT(YEAR  FROM pd.fecha_reporte) = $2
+		  AND EXTRACT(MONTH FROM pd.fecha_reporte) = $3
+		  AND pd.pais_procedencia_id = (
+		      SELECT id FROM public.paises_replica_cache WHERE codigo_iso = 'BOL' LIMIT 1
+		  )
+		ORDER BY pd.ingreso_at`
+
+	rows, err := r.statsPool.Query(ctx, sql, establecimientoID, anio, mes)
+	if err != nil {
+		return nil, fmt.Errorf("reporte nacional query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.ParteParaReporte
+	for rows.Next() {
+		var p domain.ParteParaReporte
+		if err := rows.Scan(&p.Dia, &p.IngresoAt, &p.SalidaAt, &p.Departamento); err != nil {
+			return nil, fmt.Errorf("scan reporte nacional: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, rows.Err()
+}
+
+// ─── Reporte Consolidado Internacional ────────────────────────────────────────
+
+// GetReporteInternacional devuelve todos los partes de un mes para un establecimiento
+// con el código ISO del país de procedencia. El mapeo a columnas se hace en el service.
+func (r *ParteDiarioRepo) GetReporteInternacional(
+	ctx context.Context,
+	establecimientoID string,
+	anio, mes int,
+) ([]domain.ParteParaReporte, error) {
+
+	const sql = `
+		SELECT
+			EXTRACT(DAY FROM pd.fecha_reporte)::int           AS dia,
+			EXTRACT(EPOCH FROM pd.ingreso_at)::bigint         AS ingreso_ts,
+			CASE WHEN pd.salida_at IS NOT NULL
+			     THEN EXTRACT(EPOCH FROM pd.salida_at)::bigint
+			     ELSE NULL END                                AS salida_ts,
+			COALESCE(p.codigo_iso, 'XX')                      AS pais_iso
+		FROM public.partes_diarios pd
+		LEFT JOIN public.paises_replica_cache p ON p.id = pd.pais_procedencia_id
+		WHERE pd.establecimiento_id = $1
+		  AND pd.estado_operativo   = 'ACTIVO'
+		  AND EXTRACT(YEAR  FROM pd.fecha_reporte) = $2
+		  AND EXTRACT(MONTH FROM pd.fecha_reporte) = $3
+		ORDER BY pd.ingreso_at`
+
+	rows, err := r.statsPool.Query(ctx, sql, establecimientoID, anio, mes)
+	if err != nil {
+		return nil, fmt.Errorf("reporte internacional query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.ParteParaReporte
+	for rows.Next() {
+		var p domain.ParteParaReporte
+		if err := rows.Scan(&p.Dia, &p.IngresoAt, &p.SalidaAt, &p.Departamento); err != nil {
+			return nil, fmt.Errorf("scan reporte internacional: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, rows.Err()
+}
+
+// ─── Reporte Consolidado por Municipio ────────────────────────────────────────
+
+// GetReporteMunicipioNacional trae todos los partes bolivianos del mes para
+// una lista de establecimientos, con el departamento de procedencia de cada parte.
+func (r *ParteDiarioRepo) GetReporteMunicipioNacional(
+	ctx context.Context,
+	estIDs []string,
+	anio, mes int,
+) ([]domain.ParteParaMunicipio, error) {
+	if len(estIDs) == 0 {
+		return nil, nil
+	}
+
+	const sql = `
+		SELECT
+			pd.establecimiento_id::text                       AS est_id,
+			EXTRACT(EPOCH FROM pd.ingreso_at)::bigint         AS ingreso_ts,
+			CASE WHEN pd.salida_at IS NOT NULL
+			     THEN EXTRACT(EPOCH FROM pd.salida_at)::bigint
+			     ELSE NULL END                                AS salida_ts,
+			COALESCE(dp.nombre, 'Sin datos')                  AS departamento
+		FROM public.partes_diarios pd
+		LEFT JOIN public.localidades_replica_cache           lc ON lc.id = pd.localidad_procedencia_id
+		LEFT JOIN public.divisiones_secundarias_replica_cache ds ON ds.id = lc.division_secundaria_id
+		LEFT JOIN public.divisiones_principales_replica_cache dp ON dp.id = ds.division_principal_id
+		WHERE pd.establecimiento_id = ANY($1::uuid[])
+		  AND pd.estado_operativo   = 'ACTIVO'
+		  AND EXTRACT(YEAR  FROM pd.fecha_reporte) = $2
+		  AND EXTRACT(MONTH FROM pd.fecha_reporte) = $3
+		  AND pd.pais_procedencia_id = (
+		      SELECT id FROM public.paises_replica_cache WHERE codigo_iso = 'BOL' LIMIT 1
+		  )
+		ORDER BY pd.establecimiento_id, pd.ingreso_at`
+
+	rows, err := r.statsPool.Query(ctx, sql, estIDs, anio, mes)
+	if err != nil {
+		return nil, fmt.Errorf("reporte municipio nacional query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.ParteParaMunicipio
+	for rows.Next() {
+		var p domain.ParteParaMunicipio
+		if err := rows.Scan(&p.EstablecimientoID, &p.IngresoAt, &p.SalidaAt, &p.Departamento); err != nil {
+			return nil, fmt.Errorf("scan reporte municipio: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, rows.Err()
+}
+
+// GetReporteMunicipioInternacional trae todos los partes del mes para una lista
+// de establecimientos con el ISO del país de procedencia (sin filtrar por Bolivia).
+func (r *ParteDiarioRepo) GetReporteMunicipioInternacional(
+	ctx context.Context,
+	estIDs []string,
+	anio, mes int,
+) ([]domain.ParteParaMunicipio, error) {
+	if len(estIDs) == 0 {
+		return nil, nil
+	}
+
+	const sql = `
+		SELECT
+			pd.establecimiento_id::text                       AS est_id,
+			EXTRACT(EPOCH FROM pd.ingreso_at)::bigint         AS ingreso_ts,
+			CASE WHEN pd.salida_at IS NOT NULL
+			     THEN EXTRACT(EPOCH FROM pd.salida_at)::bigint
+			     ELSE NULL END                                AS salida_ts,
+			COALESCE(p.codigo_iso, 'XX')                      AS pais_iso
+		FROM public.partes_diarios pd
+		LEFT JOIN public.paises_replica_cache p ON p.id = pd.pais_procedencia_id
+		WHERE pd.establecimiento_id = ANY($1::uuid[])
+		  AND pd.estado_operativo   = 'ACTIVO'
+		  AND EXTRACT(YEAR  FROM pd.fecha_reporte) = $2
+		  AND EXTRACT(MONTH FROM pd.fecha_reporte) = $3
+		ORDER BY pd.establecimiento_id, pd.ingreso_at`
+
+	rows, err := r.statsPool.Query(ctx, sql, estIDs, anio, mes)
+	if err != nil {
+		return nil, fmt.Errorf("reporte municipio internacional query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.ParteParaMunicipio
+	for rows.Next() {
+		var p domain.ParteParaMunicipio
+		if err := rows.Scan(&p.EstablecimientoID, &p.IngresoAt, &p.SalidaAt, &p.Departamento); err != nil {
+			return nil, fmt.Errorf("scan reporte municipio intl: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, rows.Err()
+}
+
 // estIDsParam convierte una lista de establecimiento_ids a interface{} para pgx.
 // Retorna nil (NULL en SQL) cuando la lista está vacía, lo que hace que la cláusula
 // WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1,',')::uuid[]))

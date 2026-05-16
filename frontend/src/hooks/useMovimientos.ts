@@ -337,13 +337,107 @@ export function useTiposHabitacion(params: { establecimientoIds?: string[]; fech
   });
 }
 
-// ── Reporte Parte Diario PDF ───────────────────────────────────────────────
-export function useReportePDF(fecha: string | null, nombreEstablecimiento: string) {
+// ── Reporte Consolidado Municipio Internacional PDF ───────────────────────
+export function useReporteMunicipioInternacionalPDF() {
+  const { accessToken } = useAuth();
+  return useMutation({
+    mutationFn: async (body: {
+      municipio: string;
+      anio: number;
+      mes: number;
+      establecimientos: { id: string; nombre: string; clasificacion: string; categoria: string }[];
+    }) => {
+      if (!accessToken) throw new Error("Sin autenticación");
+      const blob = await movimientosApi.getReporteMunicipioInternacionalPDF(accessToken, body);
+      return URL.createObjectURL(blob);
+    },
+  });
+}
+
+// ── Reporte Consolidado Municipio Nacional PDF ────────────────────────────
+export function useReporteMunicipioNacionalPDF() {
+  const { accessToken } = useAuth();
+  return useMutation({
+    mutationFn: async (body: {
+      municipio: string;
+      anio: number;
+      mes: number;
+      establecimientos: { id: string; nombre: string; clasificacion: string; categoria: string }[];
+    }) => {
+      if (!accessToken) throw new Error("Sin autenticación");
+      const blob = await movimientosApi.getReporteMunicipioNacionalPDF(accessToken, body);
+      return URL.createObjectURL(blob);
+    },
+  });
+}
+
+// ── Reporte Consolidado Internacional PDF ─────────────────────────────────
+export function useReporteInternacionalPDF(
+  establecimientoId: string | null,
+  anio: number | null,
+  mes: number | null,
+  nombre: string,
+  municipio: string
+) {
   const { accessToken } = useAuth();
   return useQuery({
-    queryKey: ["reporte-pdf", fecha],
+    queryKey: ["reporte-internacional-pdf", establecimientoId, anio, mes],
     queryFn: async () => {
-      const blob = await movimientosApi.getReportePDF(accessToken!, fecha!, nombreEstablecimiento);
+      const blob = await movimientosApi.getReporteInternacionalPDF(
+        accessToken!, establecimientoId!, anio!, mes!, nombre, municipio
+      );
+      return URL.createObjectURL(blob);
+    },
+    enabled: !USE_MOCK && !!accessToken && !!establecimientoId && !!anio && !!mes && !!nombre,
+    staleTime: 0,
+    retry: 1,
+    gcTime: 0,
+  });
+}
+
+// ── Reporte Consolidado Nacional PDF ──────────────────────────────────────
+export function useReporteNacionalPDF(
+  establecimientoId: string | null,
+  anio: number | null,
+  mes: number | null,
+  nombre: string,
+  municipio: string
+) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: ["reporte-nacional-pdf", establecimientoId, anio, mes],
+    queryFn: async () => {
+      const blob = await movimientosApi.getReporteNacionalPDF(
+        accessToken!, establecimientoId!, anio!, mes!, nombre, municipio
+      );
+      return URL.createObjectURL(blob);
+    },
+    enabled: !USE_MOCK && !!accessToken && !!establecimientoId && !!anio && !!mes && !!nombre,
+    staleTime: 0,
+    retry: 1,
+    gcTime: 0,
+  });
+}
+
+// ── Reporte Parte Diario PDF ───────────────────────────────────────────────
+export function useReportePDF(
+  fecha: string | null,
+  nombreEstablecimiento: string,
+  clasificacion: string,
+  categoria: string,
+  direccion: string,
+  telefono: string,
+  establecimientoId?: string   // opcional: solo para responsable_registro
+) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: ["reporte-pdf", fecha, establecimientoId],
+    queryFn: async () => {
+      const blob = await movimientosApi.getReportePDF(
+        accessToken!, fecha!, nombreEstablecimiento,
+        clasificacion, categoria, direccion, telefono,
+        establecimientoId
+      );
       return URL.createObjectURL(blob);
     },
     enabled: !USE_MOCK && !!accessToken && !!fecha && !!nombreEstablecimiento,

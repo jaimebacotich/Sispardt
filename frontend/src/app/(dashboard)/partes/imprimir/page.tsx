@@ -11,24 +11,33 @@ import { useEstablecimientoActual } from "@/hooks/useEstablecimientoActual";
 
 export default function ImprimirPartePage() {
   const router = useRouter();
-  const { nombre: nombreEstablecimiento, isLoading: loadingEstab } = useEstablecimientoActual();
+  const {
+    nombre: nombreEstablecimiento,
+    clasificacion,
+    categoria,
+    direccion,
+    telefono,
+    isLoading: loadingEstab,
+  } = useEstablecimientoActual();
 
-  const [fechaRaw, setFechaRaw] = useState<string | null>(null);   // YYYY-MM-DD
+  const [fechaRaw, setFechaRaw] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl]     = useState<string | null>(null);
 
   const { data: blobUrl, isFetching, isError } = useReportePDF(
     fechaRaw,
-    nombreEstablecimiento ?? ""
+    nombreEstablecimiento ?? "",
+    clasificacion ?? "",
+    categoria     ?? "",
+    direccion     ?? "",
+    telefono      ?? ""
   );
 
-  // Cuando llega el blob URL, mostrar el preview
   useEffect(() => {
     if (blobUrl && !isFetching) {
       setPdfUrl(blobUrl);
     }
   }, [blobUrl, isFetching]);
 
-  // Error al obtener el PDF
   useEffect(() => {
     if (isError && fechaRaw) {
       toast.error("No se pudo generar el reporte. Intenta nuevamente.");
@@ -37,7 +46,6 @@ export default function ImprimirPartePage() {
   }, [isError, fechaRaw]);
 
   function handleGenerar(fecha: string) {
-    // Liberar blob URL anterior si existe
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     setPdfUrl(null);
     setFechaRaw(fecha);
@@ -50,14 +58,12 @@ export default function ImprimirPartePage() {
     router.back();
   }
 
-  // Formatear fecha para mostrar: YYYY-MM-DD → DD/MM/YYYY
   const fechaDisplay = fechaRaw
     ? format(new Date(fechaRaw + "T12:00:00"), "dd/MM/yyyy")
     : "";
 
   return (
     <>
-      {/* Spinner mientras carga el PDF */}
       {(isFetching || loadingEstab) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl px-8 py-6 shadow-xl flex flex-col items-center gap-3">
@@ -67,12 +73,10 @@ export default function ImprimirPartePage() {
         </div>
       )}
 
-      {/* Modal selector de fecha */}
       {!pdfUrl && !isFetching && (
         <FechaModal onGenerar={handleGenerar} />
       )}
 
-      {/* Preview del PDF */}
       {pdfUrl && fechaRaw && (
         <PreviewModal
           pdfUrl={pdfUrl}

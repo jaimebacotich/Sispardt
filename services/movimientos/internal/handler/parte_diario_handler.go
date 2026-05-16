@@ -150,17 +150,36 @@ func (h *ParteDiarioHandler) Anular(w http.ResponseWriter, r *http.Request) {
 
 func (h *ParteDiarioHandler) Reporte(w http.ResponseWriter, r *http.Request) {
 	claims := auth.FromContext(r.Context())
-	estID := claims.EstablecimientoID
-	if estID == "" {
-		jsonError(w, http.StatusForbidden, "recepcionista sin establecimiento asignado")
-		return
+
+	// Recepcionista: usa el establecimiento del JWT (forzado por RLS).
+	// Responsable de registro: puede seleccionar cualquier establecimiento.
+	var estID string
+	if claims.HasRole(auth.RoleRecepcionista) {
+		estID = claims.EstablecimientoID
+		if estID == "" {
+			jsonError(w, http.StatusForbidden, "recepcionista sin establecimiento asignado")
+			return
+		}
+	} else {
+		estID = r.URL.Query().Get("establecimiento_id")
+		if estID == "" {
+			jsonError(w, http.StatusBadRequest, "parámetro 'establecimiento_id' requerido")
+			return
+		}
 	}
 	fecha := r.URL.Query().Get("fecha")
 	if fecha == "" {
 		jsonError(w, http.StatusBadRequest, "parámetro 'fecha' requerido (YYYY-MM-DD)")
 		return
 	}
-	nombreEstablecimiento := r.URL.Query().Get("nombre")
+	q := r.URL.Query()
+	infoEstab := pdf.InfoEstablecimiento{
+		Nombre:        q.Get("nombre"),
+		Clasificacion: q.Get("clasificacion"),
+		Categoria:     q.Get("categoria"),
+		Direccion:     q.Get("direccion"),
+		Telefono:      q.Get("telefono"),
+	}
 
 	reporte, err := h.svc.GetReportePorFecha(r.Context(), estID, fecha)
 	if err != nil {
@@ -173,8 +192,137 @@ func (h *ParteDiarioHandler) Reporte(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, nombreArchivo))
 
-	if err := pdf.GenerarParteDiario(w, reporte, nombreEstablecimiento); err != nil {
+	if err := pdf.GenerarParteDiario(w, reporte, infoEstab); err != nil {
 		log.Error().Err(err).Msg("error al escribir PDF")
+	}
+}
+
+func (h *ParteDiarioHandler) ReporteMunicipioNacional(w http.ResponseWriter, r *http.Request) {
+	var req domain.ReqReporteMunicipio
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
+		return
+	}
+	if req.Anio <= 0 || req.Mes < 1 || req.Mes > 12 || len(req.Establecimientos) == 0 {
+		jsonError(w, http.StatusBadRequest, "municipio, anio, mes y establecimientos son requeridos")
+		return
+	}
+
+	reporte, err := h.svc.GetReporteMunicipioNacional(r.Context(), req)
+	if err != nil {
+		log.Error().Err(err).Str("municipio", req.Municipio).Msg("error al generar reporte municipio nacional")
+		jsonError(w, http.StatusInternalServerError, "error al generar reporte: "+err.Error())
+		return
+	}
+
+	nombreArchivo := fmt.Sprintf("consolidado-municipal-%s-%02d.pdf", strings.ReplaceAll(req.Municipio, " ", "-"), req.Mes)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, nombreArchivo))
+
+	if err := pdf.GenerarReporteMunicipioNacional(w, reporte); err != nil {
+		log.Error().Err(err).Msg("error al escribir PDF reporte municipio")
+	}
+}
+
+func (h *ParteDiarioHandler) ReporteMunicipioInternacional(w http.ResponseWriter, r *http.Request) {
+	var req domain.ReqReporteMunicipio
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
+		return
+	}
+	if req.Anio <= 0 || req.Mes < 1 || req.Mes > 12 || len(req.Establecimientos) == 0 {
+		jsonError(w, http.StatusBadRequest, "municipio, anio, mes y establecimientos son requeridos")
+		return
+	}
+
+	reporte, err := h.svc.GetReporteMunicipioInternacional(r.Context(), req)
+	if err != nil {
+		log.Error().Err(err).Str("municipio", req.Municipio).Msg("error al generar reporte municipio internacional")
+		jsonError(w, http.StatusInternalServerError, "error al generar reporte: "+err.Error())
+		return
+	}
+
+	nombreArchivo := fmt.Sprintf("consolidado-internacional-%s-%02d.pdf", strings.ReplaceAll(req.Municipio, " ", "-"), req.Mes)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, nombreArchivo))
+
+	if err := pdf.GenerarReporteMunicipioInternacional(w, reporte); err != nil {
+		log.Error().Err(err).Msg("error al escribir PDF reporte municipio internacional")
+	}
+}
+
+func (h *ParteDiarioHandler) ReporteNacional(w http.ResponseWriter, r *http.Request) {
+	estID := r.URL.Query().Get("establecimiento_id")
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "parámetro 'establecimiento_id' requerido")
+		return
+	}
+	anioStr := r.URL.Query().Get("anio")
+	mesStr := r.URL.Query().Get("mes")
+	if anioStr == "" || mesStr == "" {
+		jsonError(w, http.StatusBadRequest, "parámetros 'anio' y 'mes' requeridos")
+		return
+	}
+	anio, errA := strconv.Atoi(anioStr)
+	mes, errM := strconv.Atoi(mesStr)
+	if errA != nil || errM != nil || mes < 1 || mes > 12 {
+		jsonError(w, http.StatusBadRequest, "año o mes inválido")
+		return
+	}
+	nombreEstablecimiento := r.URL.Query().Get("nombre")
+	municipio := r.URL.Query().Get("municipio")
+
+	reporte, err := h.svc.GetReporteNacional(r.Context(), estID, anio, mes, nombreEstablecimiento, municipio)
+	if err != nil {
+		log.Error().Err(err).Str("establecimiento_id", estID).Int("anio", anio).Int("mes", mes).Msg("error al generar reporte nacional")
+		jsonError(w, http.StatusInternalServerError, "error al generar reporte: "+err.Error())
+		return
+	}
+
+	nombreArchivo := fmt.Sprintf("reporte-nacional-%s-%02d.pdf", anioStr, mes)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, nombreArchivo))
+
+	if err := pdf.GenerarReporteNacional(w, reporte); err != nil {
+		log.Error().Err(err).Msg("error al escribir PDF reporte nacional")
+	}
+}
+
+func (h *ParteDiarioHandler) ReporteInternacional(w http.ResponseWriter, r *http.Request) {
+	estID := r.URL.Query().Get("establecimiento_id")
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "parámetro 'establecimiento_id' requerido")
+		return
+	}
+	anioStr := r.URL.Query().Get("anio")
+	mesStr  := r.URL.Query().Get("mes")
+	if anioStr == "" || mesStr == "" {
+		jsonError(w, http.StatusBadRequest, "parámetros 'anio' y 'mes' requeridos")
+		return
+	}
+	anio, errA := strconv.Atoi(anioStr)
+	mes,  errM := strconv.Atoi(mesStr)
+	if errA != nil || errM != nil || mes < 1 || mes > 12 {
+		jsonError(w, http.StatusBadRequest, "año o mes inválido")
+		return
+	}
+	q := r.URL.Query()
+	reporte, err := h.svc.GetReporteInternacional(
+		r.Context(), estID, anio, mes,
+		q.Get("nombre"), q.Get("municipio"),
+	)
+	if err != nil {
+		log.Error().Err(err).Str("establecimiento_id", estID).Msg("error al generar reporte internacional")
+		jsonError(w, http.StatusInternalServerError, "error al generar reporte: "+err.Error())
+		return
+	}
+
+	nombreArchivo := fmt.Sprintf("reporte-internacional-%s-%02d.pdf", anioStr, mes)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, nombreArchivo))
+
+	if err := pdf.GenerarReporteInternacional(w, reporte); err != nil {
+		log.Error().Err(err).Msg("error al escribir PDF reporte internacional")
 	}
 }
 

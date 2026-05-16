@@ -25,6 +25,7 @@ import {
   History,
   Users,
   Printer,
+  FileBarChart2,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 import { useEstablecimientoActual } from "@/hooks/useEstablecimientoActual";
@@ -110,6 +111,12 @@ const NAV_ENTRIES: NavEntry[] = [
     roles: ["recepcionista"],
   },
   {
+    label: "Registros Fuera de Plazo",
+    href: "/reporte/fuera-de-plazo",
+    icon: FileWarning,
+    roles: ["recepcionista"],
+  },
+  {
     type: "group",
     label: "Cierre de Partes",
     icon: CalendarCheck,
@@ -118,12 +125,6 @@ const NAV_ENTRIES: NavEntry[] = [
       { label: "Cierre Actual",       href: "/cierre/actual",          icon: CalendarCheck },
       { label: "Fuera de Plazo",      href: "/cierre/fuera-de-plazo",  icon: AlertTriangle },
     ],
-  },
-  {
-    label: "Reporte Fuera de Plazo",
-    href: "/reporte/fuera-de-plazo",
-    icon: FileWarning,
-    roles: ["recepcionista"],
   },
   {
     label: "Impresión de Partes",
@@ -149,6 +150,12 @@ const NAV_ENTRIES: NavEntry[] = [
     label: "Estadísticas",
     href: "/estadisticas/general",
     icon: BarChart3,
+    roles: ["responsable_registro"],
+  },
+  {
+    label: "Reportes",
+    href: "/reportes",
+    icon: FileBarChart2,
     roles: ["responsable_registro"],
   },
   // ── Admin ────────────────────────────────────────────────────────────────
