@@ -110,6 +110,7 @@ export function EstadisticasDashboard() {
     pageSize: 500,
     localidadId: localidadId || undefined,
   });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- estList se estabiliza a través de react-query cache
   const estList: Establecimiento[] = establecimientos?.data ?? [];
 
   // KPI de infra (no dependen del período)

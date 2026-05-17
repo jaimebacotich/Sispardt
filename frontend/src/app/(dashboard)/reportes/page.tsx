@@ -121,6 +121,8 @@ export default function ReportesPage() {
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
       setPdfUrl(blob);
     }
+  // pdfUrl y tipo se excluyen intencionalmente: no deben re-disparar el efecto
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blobPD, blobNac, blobIntl, isFetching]);
 
   useEffect(() => {
@@ -128,6 +130,8 @@ export default function ReportesPage() {
       toast.error("No se pudo generar el reporte.");
       setParamsPD((p) => ({ ...p, fecha: null }));
     }
+  // paramsPD.fecha se lee como condición, no como disparador del efecto
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorPD]);
 
   useEffect(() => {
@@ -135,6 +139,8 @@ export default function ReportesPage() {
       toast.error("No se pudo generar el reporte.");
       setParamsNac({ estId: null, anio: null, mes: null, nombre: "" });
     }
+  // paramsNac.estId se lee como condición, no como disparador del efecto
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorNac, errorIntl]);
 
   // Para reportes municipales no se requiere establecimiento individual

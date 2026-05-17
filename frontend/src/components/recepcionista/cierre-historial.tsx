@@ -49,6 +49,8 @@ export function CierreHistorial() {
       setPdfUrl(blobUrl);
       setImprimiendoId(null);
     }
+  // pdfUrl se excluye intencionalmente para no crear bucles de revocación
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blobUrl, isFetching]);
 
   useEffect(() => {
@@ -57,6 +59,8 @@ export function CierreHistorial() {
       setFechaImprimir(null);
       setImprimiendoId(null);
     }
+  // fechaImprimir se lee como condición, no como disparador del efecto
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isError]);
 
   function handleImprimir(fechaReporte: string, cierreId: string) {
