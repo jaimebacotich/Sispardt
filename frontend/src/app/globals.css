@@ -118,6 +118,17 @@
   }
 }
 
+/* ── Sub-tabs Catálogos: tab activo con fondo verde (primary) ──── */
+.catalogos-subtabs [data-slot="tabs-trigger"][data-active] {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-color: transparent !important;
+  border-radius: calc(var(--radius) - 2px) !important;
+}
+.catalogos-subtabs [data-slot="tabs-trigger"][data-active]::after {
+  opacity: 0 !important;
+}
+
 /* ── Print styles para Estadísticas ───────────────────────────── */
 @media print {
   /* Forzar colores exactos (fondos, gráficos SVG) */

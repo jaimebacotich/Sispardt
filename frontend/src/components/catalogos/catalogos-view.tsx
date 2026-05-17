@@ -281,7 +281,7 @@ export function CatalogosView() {
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <Tabs value={subHospedaje} onValueChange={setSubHospedaje} className="flex-col">
             <div className="border-b border-border px-4 pt-3 pb-0">
-              <TabsList variant="line" className="w-full justify-start gap-1 h-auto pb-0">
+              <TabsList variant="line" className="catalogos-subtabs w-full justify-start gap-1 h-auto pb-0">
                 <TabsTrigger value="clasificaciones" className="pb-3 text-xs gap-1.5">
                   <Tag size={13} /> Clasificaciones
                 </TabsTrigger>
@@ -415,7 +415,7 @@ export function CatalogosView() {
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <Tabs value={subGeografico} onValueChange={setSubGeografico} className="flex-col">
             <div className="border-b border-border px-4 pt-3 pb-0">
-              <TabsList variant="line" className="w-full justify-start gap-1 h-auto pb-0">
+              <TabsList variant="line" className="catalogos-subtabs w-full justify-start gap-1 h-auto pb-0">
                 <TabsTrigger value="paises" className="pb-3 text-xs gap-1.5">
                   <Globe size={13} /> Países
                 </TabsTrigger>
