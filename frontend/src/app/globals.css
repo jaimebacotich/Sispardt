@@ -132,8 +132,20 @@
     page-break-inside: avoid;
   }
 
+  /* ── KPI cards: escala proporcional ─────────────────────────── */
+  .print-kpi-grid {
+    zoom: 0.78;
+  }
+
+  /* ── Chart cards: escala proporcional (zoom afecta layout Y visual) ─ */
+  /* Recharts renderiza SVG con tamaños calculados en JS.               */
+  /* zoom escala TODO el elemento incluyendo el SVG sin desplazamiento. */
+  .print-chart-card {
+    zoom: 0.62;
+  }
+
   @page {
-    size: 216mm 330mm; /* Oficio — vertical (33cm largo) */
-    margin: 10mm;
+    size: 216mm 279mm; /* Carta / Letter — vertical */
+    margin: 8mm;
   }
 }

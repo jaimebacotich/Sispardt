@@ -159,7 +159,7 @@ export function EstadisticasDashboard() {
     ahora.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div id="estadisticas-contenido" className="space-y-5 animate-fade-in">
+    <div id="estadisticas-contenido" className="space-y-5 print:space-y-2 animate-fade-in">
       {/* ── Encabezado solo visible en impresión / exportación PDF ── */}
       <div className="hidden print:block mb-3 pb-3 border-b border-gray-300">
         <p className="text-base font-bold text-center tracking-wide">
@@ -289,7 +289,7 @@ export function EstadisticasDashboard() {
       )}
 
       {/* ── 10 KPI Cards ────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="print-kpi-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 print:grid-cols-5 gap-3 print:gap-1.5">
         <StatCard compact label="Visitantes"       value={resumen?.totalHuespedes ?? 0}                  icon={Users}      iconColor="text-primary"        iconBg="bg-primary/10"        isLoading={loadingResumen} />
         <StatCard compact label="Turistas Extranj." value={resumen?.totalExtranjeros ?? 0}               icon={Globe}      iconColor="text-chart-2"        iconBg="bg-chart-2/10"        isLoading={loadingResumen} />
         <StatCard compact label="Ocupación Prom."  value={(resumen?.ocupacionPromedio ?? 0).toFixed(1)} suffix="%" icon={BedDouble}  iconColor="text-chart-3"        iconBg="bg-chart-3/10"        isLoading={loadingResumen} />
@@ -303,57 +303,57 @@ export function EstadisticasDashboard() {
       </div>
 
       {/* ── Gráficos fila 1: Tendencia Visitantes + Top Nac. ─────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm text-foreground">Tendencia de Visitantes</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Flujo de turistas registrados en el período seleccionado</p>
+      <div className="grid grid-cols-1 xl:grid-cols-2 print:grid-cols-2 gap-4 print:gap-2">
+        <div className="print-chart-card bg-card rounded-xl border border-border p-5">
+          <div className="mb-4 print:mb-1">
+            <h3 className="font-semibold text-sm text-foreground print:text-xs">Tendencia de Visitantes</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 print:hidden">Flujo de turistas registrados en el período seleccionado</p>
           </div>
           <OcupacionChart data={ocupacionData ?? []} isLoading={loadingOcupacion} />
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm text-foreground">Top Nacionalidades</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">País de origen de los huéspedes</p>
+        <div className="print-chart-card bg-card rounded-xl border border-border p-5">
+          <div className="mb-4 print:mb-1">
+            <h3 className="font-semibold text-sm text-foreground print:text-xs">Top Nacionalidades</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 print:hidden">País de origen de los huéspedes</p>
           </div>
           <NacionalidadesChart data={nacionalidades ?? []} isLoading={loadingNac} />
         </div>
       </div>
 
       {/* ── Gráficos fila 2: Ocup. por Tipo + Distribución ───────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm text-foreground">Ocupación por Tipo de Habitación</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Tasa de ocupación promedio por categoría</p>
+      <div className="grid grid-cols-1 xl:grid-cols-2 print:grid-cols-2 gap-4 print:gap-2">
+        <div className="print-chart-card bg-card rounded-xl border border-border p-5">
+          <div className="mb-4 print:mb-1">
+            <h3 className="font-semibold text-sm text-foreground print:text-xs">Ocupación por Tipo de Habitación</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 print:hidden">Tasa de ocupación promedio por categoría</p>
           </div>
           <OcupacionTipoChart data={tiposHab ?? []} isLoading={loadingTipos} />
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm text-foreground">Distribución de Tipo de Habitación</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Proporción de camas por tipo</p>
+        <div className="print-chart-card bg-card rounded-xl border border-border p-5">
+          <div className="mb-4 print:mb-1">
+            <h3 className="font-semibold text-sm text-foreground print:text-xs">Distribución de Tipo de Habitación</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 print:hidden">Proporción de camas por tipo</p>
           </div>
           <DistribucionTipoChart data={tiposHab ?? []} isLoading={loadingTipos} />
         </div>
       </div>
 
       {/* ── Gráficos fila 3: Tasa Ocupación + Motivos de Viaje ───── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm text-foreground">Tasa de Ocupación Mensual</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Evolución mensual de la ocupación hotelera</p>
+      <div className="grid grid-cols-1 xl:grid-cols-2 print:grid-cols-2 gap-4 print:gap-2">
+        <div className="print-chart-card bg-card rounded-xl border border-border p-5">
+          <div className="mb-4 print:mb-1">
+            <h3 className="font-semibold text-sm text-foreground print:text-xs">Tasa de Ocupación Mensual</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 print:hidden">Evolución mensual de la ocupación hotelera</p>
           </div>
           <TasaOcupacionChart data={ocupacionData ?? []} isLoading={loadingOcupacion} />
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="mb-4">
-            <h3 className="font-semibold text-sm text-foreground">Motivos de Viaje</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Distribución por motivo según el período seleccionado</p>
+        <div className="print-chart-card bg-card rounded-xl border border-border p-5">
+          <div className="mb-4 print:mb-1">
+            <h3 className="font-semibold text-sm text-foreground print:text-xs">Motivos de Viaje</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 print:hidden">Distribución por motivo según el período seleccionado</p>
           </div>
           <MotivosViajeChart data={motivos ?? []} isLoading={loadingMotivos} />
         </div>
