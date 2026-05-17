@@ -397,14 +397,16 @@ export function CierrePanel({ fecha, modo, onCierreDone }: CierrePanelProps) {
 
       {/* ── Botón / Estado cerrado ── */}
       {!yaCerrado ? (
-        <button
-          onClick={handleConfirmarClick}
-          disabled={cierreMutation.isPending}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors shadow-md disabled:opacity-60"
-        >
-          <CheckCircle2 size={18} />
-          Confirmar Cierre
-        </button>
+        <div className="flex justify-center">
+          <button
+            onClick={handleConfirmarClick}
+            disabled={cierreMutation.isPending}
+            className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors shadow-md disabled:opacity-60"
+          >
+            <CheckCircle2 size={16} />
+            Confirmar Cierre
+          </button>
+        </div>
       ) : (
         <div className="flex items-center justify-center gap-2 py-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 font-medium text-sm">
           <Lock size={16} />
