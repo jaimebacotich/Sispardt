@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, BedDouble, Trash2, Check, Loader2 } from "lucide-react";
+import { Plus, BedDouble, Trash2, Check, Loader2, Search, Pencil } from "lucide-react";
 import { establecimientosApi } from "@/lib/api/establecimientos";
 import type { Habitacion, TipoHabitacion, TipoCama } from "@/types/api";
 
@@ -78,6 +78,32 @@ export function HabitacionesSplitPanel({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Filtros de la lista
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroPiso, setFiltroPiso] = useState("todos");
+
+  // Pisos únicos para el dropdown (solo cuando hay más de un piso distinto)
+  const pisosUnicos = useMemo(() => {
+    const set = new Set<string>();
+    habitaciones.forEach((h) => set.add(h.piso != null ? String(h.piso) : "sin-piso"));
+    return Array.from(set).sort((a, b) => {
+      if (a === "sin-piso") return 1;
+      if (b === "sin-piso") return -1;
+      return Number(a) - Number(b);
+    });
+  }, [habitaciones]);
+
+  // Lista filtrada
+  const habitacionesFiltradas = useMemo(() => {
+    return habitaciones.filter((h) => {
+      const matchBusqueda = busqueda === "" ||
+        h.numero.toLowerCase().includes(busqueda.toLowerCase());
+      const pisoHab = h.piso != null ? String(h.piso) : "sin-piso";
+      const matchPiso = filtroPiso === "todos" || pisoHab === filtroPiso;
+      return matchBusqueda && matchPiso;
+    });
+  }, [habitaciones, busqueda, filtroPiso]);
+
   const selected = habitaciones.find((h) => h.id === selectedId);
 
   const {
@@ -104,6 +130,11 @@ export function HabitacionesSplitPanel({
     const tipo = tiposCama.find((t) => String(t.id) === String(c.tipoCamaId));
     return sum + (tipo?.capacidadPersonas ?? 0) * (c.cantidad ?? 0);
   }, 0);
+
+  // Validación: tipo Individual debe tener capacidad exactamente 1
+  const tipoSeleccionado = tiposHabitacion.find((t) => String(t.id) === String(watchedTipo));
+  const esIndividual = tipoSeleccionado?.nombre?.toLowerCase() === "individual";
+  const capacidadInvalida = esIndividual && capacidadTotal !== 1;
 
   // ── Carga inicial ───────────────────────────────────────
 
@@ -187,9 +218,9 @@ export function HabitacionesSplitPanel({
           }
         );
         setHabitaciones((prev) => [...prev, created]);
-        setSelectedId(created.id);
+        setSelectedId(null);
         setIsNew(false);
-        loadHabitacion(created);
+        reset({ nroHabitacion: "", piso: "", tipoHabitacionId: null, tieneBanoPrivado: false, camas: [{ tipoCamaId: 0, cantidad: 1 }] });
         toast.success("Habitación creada");
       } else {
         if (!selectedId) return;
@@ -215,7 +246,11 @@ export function HabitacionesSplitPanel({
         toast.success("Habitación actualizada");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al guardar";
+      const raw = err instanceof Error ? err.message : String(err);
+      // Traduce errores técnicos a mensajes claros para el usuario
+      const msg = raw.includes("23505") || raw.toLowerCase().includes("unique constraint") || raw.toLowerCase().includes("duplicate key")
+        ? "Ya existe una habitación con ese número en este establecimiento. Usa un número diferente."
+        : "Error al guardar la habitación. Intenta nuevamente.";
       toast.error(msg);
     } finally {
       setIsLoading(false);
@@ -260,10 +295,16 @@ export function HabitacionesSplitPanel({
   return (
     <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
       {/* ── Panel izquierdo: Lista ── */}
-      <div className="w-72 flex-shrink-0 bg-card border border-border rounded-xl overflow-hidden flex flex-col">
+      <div className="w-80 flex-shrink-0 bg-card border border-border rounded-xl overflow-hidden flex flex-col">
+        {/* Encabezado */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="font-semibold text-sm text-foreground">
             Habitaciones Creadas
+            {habitaciones.length > 0 && (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                ({habitacionesFiltradas.length}/{habitaciones.length})
+              </span>
+            )}
           </h3>
           <button
             onClick={startNew}
@@ -274,32 +315,75 @@ export function HabitacionesSplitPanel({
           </button>
         </div>
 
+        {/* Filtros — solo cuando hay habitaciones */}
+        {habitaciones.length > 0 && (
+          <div className="px-3 py-2 border-b border-border space-y-2">
+            {/* Búsqueda por número */}
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar habitación..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full pl-7 pr-3 py-1.5 text-xs bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            {/* Filtro por piso — siempre visible */}
+            <select
+              value={filtroPiso}
+              onChange={(e) => setFiltroPiso(e.target.value)}
+              className="w-full px-2.5 py-1.5 text-xs bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+            >
+              <option value="todos">Todos los pisos</option>
+              {pisosUnicos.map((p) => (
+                <option key={p} value={p}>
+                  {p === "sin-piso" ? "Sin piso" : `Piso ${p}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
           {habitaciones.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-6">
               No hay habitaciones. Crea la primera.
             </p>
           )}
-          {habitaciones.map((hab) => {
+          {habitaciones.length > 0 && habitacionesFiltradas.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              Sin resultados. Ajusta los filtros.
+            </p>
+          )}
+          {habitacionesFiltradas.map((hab) => {
             const isSelected = !isNew && selectedId === hab.id;
             return (
-              <button
+              <div
                 key={hab.id}
-                onClick={() => selectHabitacion(hab)}
                 className={cn(
                   "w-full text-left px-3 py-3 rounded-lg border-2 transition-all",
                   isSelected
                     ? "border-primary bg-primary/5"
-                    : "border-transparent hover:border-border bg-muted/30 hover:bg-muted/60"
+                    : "border-border bg-muted/50"
                 )}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-sm text-foreground">
                     Hab. {hab.numero}
                   </span>
-                  {isSelected && (
-                    <Check size={14} className="text-primary flex-shrink-0" />
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {isSelected && (
+                      <Check size={13} className="text-primary flex-shrink-0" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => selectHabitacion(hab)}
+                      className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                      title="Editar habitación"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  </div>
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {hab.piso != null ? `Piso ${hab.piso}` : "Sin piso"}{" "}
@@ -309,7 +393,7 @@ export function HabitacionesSplitPanel({
                   <BedDouble size={11} />
                   <span>Capacidad: {hab.capacidadTotal} personas</span>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -345,8 +429,8 @@ export function HabitacionesSplitPanel({
 
             {/* Campos del formulario */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Datos básicos */}
-              <div className="grid grid-cols-3 gap-4">
+              {/* Datos básicos + Capacidad (4 columnas) */}
+              <div className="grid grid-cols-4 gap-4 items-end">
                 <div className="space-y-1.5">
                   <Label>
                     Número de Habitación{" "}
@@ -391,6 +475,35 @@ export function HabitacionesSplitPanel({
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Capacidad total — 4ª columna junto a los datos básicos */}
+                <div className={cn(
+                  "rounded-lg px-4 py-2.5 flex items-center justify-between h-[42px] border",
+                  capacidadInvalida
+                    ? "bg-destructive/10 border-destructive/40"
+                    : "bg-primary/5 border-primary/20"
+                )}>
+                  <div>
+                    <div className={cn(
+                      "text-[10px] font-medium uppercase tracking-wide leading-none",
+                      capacidadInvalida ? "text-destructive/70" : "text-primary/70"
+                    )}>
+                      {capacidadInvalida ? "Individual = 1 persona" : "Capacidad Total"}
+                    </div>
+                    <div className="text-xl font-bold text-foreground leading-tight">
+                      {capacidadTotal}
+                      <span className="text-xs font-normal text-muted-foreground ml-1">
+                        {capacidadInvalida ? "← debe ser 1" : "personas"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
+                    capacidadInvalida ? "bg-destructive" : "bg-primary"
+                  )}>
+                    <BedDouble size={13} className="text-white" />
+                  </div>
                 </div>
               </div>
 
@@ -442,16 +555,30 @@ export function HabitacionesSplitPanel({
                   </p>
                 )}
 
-                <div className="space-y-2.5">
+                {/* Grid 2 columnas para las camas */}
+                <div className="grid grid-cols-2 gap-2.5">
                   {fields.map((field, index) => (
                     <div
                       key={field.id}
-                      className="flex items-center gap-3 bg-muted/40 rounded-lg px-4 py-3"
+                      className="bg-muted/40 rounded-lg px-3 py-3 space-y-2"
                     >
-                      <div className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
-                        {index + 1}
+                      {/* Número + botón eliminar */}
+                      <div className="flex items-center justify-between">
+                        <div className="w-5 h-5 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
+                          {index + 1}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => remove(index)}
+                          disabled={fields.length === 1}
+                          className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
-                      <div className="flex-1">
+
+                      {/* Tipo de cama */}
+                      <div>
                         <Label className="text-xs text-muted-foreground mb-1 block">
                           Tipo de Cama
                         </Label>
@@ -465,22 +592,19 @@ export function HabitacionesSplitPanel({
                             setValue(`camas.${index}.tipoCamaId`, Number(v))
                           }
                         >
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue placeholder="Seleccionar tipo...">
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Seleccionar...">
                               {(() => {
                                 const t = tiposCama.find(
                                   (t) => String(t.id) === String(watchedCamas[index]?.tipoCamaId)
                                 );
-                                return t
-                                  ? `${t.nombre} (${t.capacidadPersonas} ${t.capacidadPersonas === 1 ? "persona" : "personas"})`
-                                  : undefined;
+                                return t ? `${t.nombre} (${t.capacidadPersonas}p)` : undefined;
                               })()}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {tiposCama
                               .filter((t) => {
-                                // Mostrar: tipos no usados en otras filas + el tipo de esta fila
                                 const tiposOtrasFilas = watchedCamas
                                   .filter((_, i) => i !== index)
                                   .map((c) => String(c.tipoCamaId))
@@ -496,7 +620,9 @@ export function HabitacionesSplitPanel({
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="w-24">
+
+                      {/* Cantidad */}
+                      <div>
                         <Label className="text-xs text-muted-foreground mb-1 block">
                           Cantidad
                         </Label>
@@ -504,48 +630,23 @@ export function HabitacionesSplitPanel({
                           type="number"
                           min={1}
                           max={10}
-                          className="h-8 text-sm"
+                          className="h-8 text-xs"
                           {...register(`camas.${index}.cantidad`)}
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        disabled={fields.length === 1}
-                        className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed mt-4"
-                      >
-                        <Trash2 size={14} />
-                      </button>
                     </div>
                   ))}
-                </div>
 
-                {/* Capacidad calculada */}
-                <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-5 py-4 mt-2">
-                  <div>
-                    <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                      Capacidad Total Calculada
-                    </div>
-                    <div className="text-3xl font-bold text-foreground mt-0.5">
-                      {capacidadTotal}
-                      <span className="text-sm font-normal text-muted-foreground ml-1">
-                        personas
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-                    <BedDouble size={22} className="text-primary-foreground" />
-                  </div>
                 </div>
               </div>
             </div>
 
             {/* Botones inferiores */}
-            <div className="border-t border-border px-6 py-4 flex items-center gap-3">
+            <div className="border-t border-border px-6 py-4 flex items-center justify-center gap-3">
               <button
                 type="submit"
-                disabled={isLoading}
-                className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-70"
+                disabled={isLoading || capacidadInvalida}
+                className="w-44 bg-primary text-primary-foreground py-2.5 rounded-lg font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-70"
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -560,15 +661,8 @@ export function HabitacionesSplitPanel({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (isNew) {
-                    setIsNew(false);
-                    if (habitaciones[0]) selectHabitacion(habitaciones[0]);
-                  } else if (selected) {
-                    loadHabitacion(selected);
-                  }
-                }}
-                className="px-5 py-2.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors"
+                onClick={() => { setSelectedId(null); setIsNew(false); }}
+                className="w-44 py-2.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors"
               >
                 Cancelar
               </button>

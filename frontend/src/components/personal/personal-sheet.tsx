@@ -26,7 +26,7 @@ const schema = z.object({
   nombres: z.string().min(2, "Ingresa al menos 2 caracteres"),
   apellidos: z.string().min(2, "Ingresa al menos 2 caracteres"),
   tipoPersonalId: z.string().min(1, "Selecciona el tipo de personal"),
-  documentoIdentidad: z.string().optional(),
+  documentoIdentidad: z.string().min(1, "El CI / Documento de identidad es requerido"),
   telefono: z.string().optional(),
   usuarioSistema: z.boolean(),
   username: z.string().max(100).regex(/^[a-z0-9._-]*$/, "Solo letras minúsculas, números, puntos, guiones").optional(),
@@ -120,9 +120,9 @@ export function PersonalSheet({
   }, [open, item, reset]);
 
   function onSubmit(data: FormData) {
-    const ci = data.documentoIdentidad?.trim() ?? "";
+    const ci = data.documentoIdentidad.trim();
     const otherCIs = existingCI.filter((c) => c !== (item?.documentoIdentidad ?? ""));
-    if (ci && otherCIs.includes(ci)) {
+    if (otherCIs.includes(ci)) {
       setError("documentoIdentidad", {
         message: "Este CI ya está registrado en el establecimiento",
       });
@@ -227,7 +227,7 @@ export function PersonalSheet({
           <FormField
             control={control}
             name="documentoIdentidad"
-            label="CI / Documento de identidad"
+            label="CI / Documento de identidad *"
             description="Debe ser único dentro del establecimiento"
             render={({ field, fieldState }) => (
               <Input

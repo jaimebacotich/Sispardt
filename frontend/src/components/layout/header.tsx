@@ -38,7 +38,8 @@ function getPageTitle(pathname: string): string {
 export function Header() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
+  const esDireccionDptal = roles.includes("responsable_registro") || roles.includes("tecnico_registro");
   const { nombre: establecimientoNombre } = useEstablecimientoActual();
   const [isOnline, setIsOnline] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -56,9 +57,11 @@ export function Header() {
   }, []);
 
   const rawTitle = getPageTitle(pathname);
-  const title = rawTitle === "SISPARDT"
-    ? (establecimientoNombre ?? "Dirección Dptal. de Turismo Tarija")
-    : rawTitle;
+  const title = esDireccionDptal
+    ? "Dirección Dptal. de Turismo Tarija"
+    : rawTitle === "SISPARDT"
+      ? (establecimientoNombre ?? "Dirección Dptal. de Turismo Tarija")
+      : rawTitle;
 
   return (
     <header className="h-14 bg-card border-b border-border flex items-center justify-between px-6 flex-shrink-0">
