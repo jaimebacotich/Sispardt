@@ -33,6 +33,7 @@ export const movimientosApi = {
     params?: {
       page?: number;
       pageSize?: number;
+      establecimientoId?: string;
       estadoOperativo?: string;
       soloActivos?: boolean;
       soloCheckout?: boolean;
@@ -43,15 +44,16 @@ export const movimientosApi = {
     }
   ) => {
     const q = new URLSearchParams();
-    if (params?.page)            q.set("page", String(params.page));
-    if (params?.pageSize)        q.set("page_size", String(params.pageSize));
-    if (params?.estadoOperativo) q.set("estado_operativo", params.estadoOperativo);
-    if (params?.soloActivos)     q.set("solo_activos", "true");
-    if (params?.soloCheckout)    q.set("solo_checkout", "true");
-    if (params?.fechaReporte)    q.set("fecha_reporte", params.fechaReporte);
-    if (params?.incluirAnulados) q.set("incluir_anulados", "true");
-    if (params?.salidaFecha)     q.set("salida_fecha", params.salidaFecha);
-    if (params?.activoEnFecha)   q.set("activo_en_fecha", params.activoEnFecha);
+    if (params?.page)               q.set("page", String(params.page));
+    if (params?.pageSize)           q.set("page_size", String(params.pageSize));
+    if (params?.establecimientoId)  q.set("establecimiento_id", params.establecimientoId);
+    if (params?.estadoOperativo)    q.set("estado_operativo", params.estadoOperativo);
+    if (params?.soloActivos)        q.set("solo_activos", "true");
+    if (params?.soloCheckout)       q.set("solo_checkout", "true");
+    if (params?.fechaReporte)       q.set("fecha_reporte", params.fechaReporte);
+    if (params?.incluirAnulados)    q.set("incluir_anulados", "true");
+    if (params?.salidaFecha)        q.set("salida_fecha", params.salidaFecha);
+    if (params?.activoEnFecha)      q.set("activo_en_fecha", params.activoEnFecha);
     return apiClient.get<PagedResult<ParteDiario>>(`/api/v1/partes?${q}`, token);
   },
 

@@ -154,11 +154,11 @@ func GenerarParteDiario(w io.Writer, reporte *domain.ReporteParteDiario, info In
 }
 
 func dibujarTablaPartes(pdf *fpdf.Fpdf, filas []domain.ReporteFilaParteDiario) {
-	// Cabecera
+	// ── Cabecera — mismo estilo que reportes consolidados ──────────────────────
 	pdf.SetFont("DejaVu", "B", fszHPD)
-	pdf.SetFillColor(210, 210, 210)
-	pdf.SetTextColor(0, 0, 0)
-	pdf.SetDrawColor(150, 150, 150)
+	pdf.SetFillColor(139, 115, 85)   // marrón oliva
+	pdf.SetTextColor(255, 255, 255)  // texto blanco
+	pdf.SetDrawColor(160, 160, 160)
 	pdf.SetLineWidth(0.2)
 
 	for _, col := range columnasPartes {
@@ -168,17 +168,19 @@ func dibujarTablaPartes(pdf *fpdf.Fpdf, filas []domain.ReporteFilaParteDiario) {
 
 	if len(filas) == 0 {
 		pdf.SetFont("DejaVu", "I", fszPD)
-		pdf.SetFillColor(255, 255, 255)
-		pdf.CellFormat(anchoTotalPartes(), rowDPD, "Sin registros para esta fecha.", "1", 1, "C", false, 0, "")
+		pdf.SetFillColor(245, 245, 220) // crema
+		pdf.SetTextColor(100, 100, 100)
+		pdf.CellFormat(anchoTotalPartes(), rowDPD, "Sin registros para esta fecha.", "1", 1, "C", true, 0, "")
 		return
 	}
 
 	pdf.SetFont("DejaVu", "", fszPD)
+	pdf.SetTextColor(0, 0, 0)
 	for i, fila := range filas {
 		if i%2 == 0 {
-			pdf.SetFillColor(255, 255, 255)
+			pdf.SetFillColor(255, 255, 255)  // blanco
 		} else {
-			pdf.SetFillColor(245, 245, 245)
+			pdf.SetFillColor(245, 245, 220)  // crema
 		}
 
 		valores := []string{

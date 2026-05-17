@@ -38,6 +38,8 @@ import {
   useLocalidades,
   useDeleteEstablecimiento,
 } from "@/hooks/useEstablecimientos";
+import { useAuth } from "@/hooks/useAuth";
+import { movimientosApi } from "@/lib/api/movimientos";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,6 +71,8 @@ export function EstablecimientosList() {
   // Acciones
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const deleteMutation = useDeleteEstablecimiento();
+  const { accessToken } = useAuth();
+  const [verificando, setVerificando] = useState(false);
 
   // Datos reales
   const { data: pagedResult, isLoading } = useEstablecimientos({ pageSize: 200 });
@@ -165,12 +169,28 @@ export function EstablecimientosList() {
   }
 
   async function handleDelete() {
-    if (!deleteId) return;
+    if (!deleteId || !accessToken) return;
+    setVerificando(true);
     try {
+      // Verificar si el establecimiento tiene partes diarios registrados
+      const result = await movimientosApi.listPartes(accessToken, {
+        establecimientoId: deleteId,
+        pageSize: 1,
+        incluirAnulados: true,
+      });
+      if (result.total > 0) {
+        toast.error(
+          "No se puede eliminar: el establecimiento tiene partes diarios registrados.",
+          { duration: 5000 }
+        );
+        setDeleteId(null);
+        return;
+      }
       await deleteMutation.mutateAsync(deleteId);
     } catch {
       toast.error("Error al eliminar");
     } finally {
+      setVerificando(false);
       setDeleteId(null);
     }
   }
@@ -522,13 +542,13 @@ export function EstablecimientosList() {
 
       <ConfirmModal
         open={!!deleteId}
-        onClose={() => setDeleteId(null)}
+        onClose={() => !verificando && !deleteMutation.isPending && setDeleteId(null)}
         onConfirm={handleDelete}
         title="Eliminar establecimiento"
         description="¿Confirmas que deseas eliminar este establecimiento? Esta acción es irreversible."
-        confirmLabel="Eliminar"
+        confirmLabel={verificando ? "Verificando…" : "Eliminar"}
         variant="destructive"
-        isLoading={deleteMutation.isPending}
+        isLoading={verificando || deleteMutation.isPending}
       />
     </div>
   );

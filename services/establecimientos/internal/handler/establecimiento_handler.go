@@ -193,6 +193,12 @@ func (h *EstablecimientoHandler) CreatePersonal(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Solo responsable_registro y admin_general pueden crear usuarios de sistema (recepcionistas).
+	if req.UsuarioSistema && claims.HasRole(auth.RoleTecnicoRegistro) && !claims.HasRole(auth.RoleResponsableRegistro) && !claims.HasRole(auth.RoleAdminGeneral) {
+		jsonError(w, http.StatusForbidden, "solo el Responsable de Registro puede crear usuarios recepcionistas en el sistema")
+		return
+	}
+
 	result, err := h.svc.CreatePersonal(r.Context(), claims.Sub, r.RemoteAddr, id, req)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())

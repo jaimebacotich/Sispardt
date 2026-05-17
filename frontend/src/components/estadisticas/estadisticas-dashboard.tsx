@@ -161,9 +161,34 @@ export function EstadisticasDashboard() {
   return (
     <div id="estadisticas-contenido" className="space-y-5 animate-fade-in">
       {/* ── Encabezado solo visible en impresión / exportación PDF ── */}
-      <div className="hidden print:block mb-4 border-b pb-3">
-        <p className="text-lg font-bold text-center">Sistema de Partes Diarios Tarija — SISPARDT</p>
-        <p className="text-sm text-center text-gray-600">Estadísticas Generales · {actualizado}</p>
+      <div className="hidden print:block mb-3 pb-3 border-b border-gray-300">
+        <p className="text-base font-bold text-center tracking-wide">
+          Sistema de Partes Diarios Tarija — SISPARDT
+        </p>
+        <p className="text-sm font-semibold text-center mt-0.5">Estadísticas Generales</p>
+        {/* Resumen de filtros activos */}
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-0.5 mt-2 text-xs text-gray-600">
+          <span>
+            <strong>Municipio:</strong>{" "}
+            {localidadId
+              ? localidades.find((l) => String(l.id) === localidadId)?.nombre ?? localidadId
+              : "Todos"}
+          </span>
+          {establecimientoId && (
+            <span>
+              <strong>Establecimiento:</strong>{" "}
+              {estList.find((e) => e.id === establecimientoId)?.razonSocialCorta ??
+               estList.find((e) => e.id === establecimientoId)?.razonSocial ?? establecimientoId}
+            </span>
+          )}
+          <span>
+            <strong>Período:</strong>{" "}
+            {periodo === "custom"
+              ? `${fd} — ${fh}`
+              : PERIODO_OPTS.find((p) => p.key === periodo)?.label ?? periodo}
+          </span>
+          <span><strong>Generado:</strong> {actualizado}</span>
+        </div>
       </div>
 
       {/* ── Filtros maestros — ocultos en impresión ──────────────── */}

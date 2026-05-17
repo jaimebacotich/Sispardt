@@ -6,7 +6,7 @@ export const metadata = { title: "Estadísticas Generales" };
 
 export default function EstadisticasPage() {
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div id="estadisticas-export-wrapper" className="space-y-4 animate-fade-in">
       <PageHeader
         title="Estadísticas Generales"
         subtitle="Análisis de ocupación, visitantes y rendimiento hotelero"

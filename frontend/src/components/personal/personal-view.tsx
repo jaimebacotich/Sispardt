@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { PersonalSheet } from "./personal-sheet";
 import { establecimientosApi } from "@/lib/api/establecimientos";
 import { useSession } from "next-auth/react";
+import { useAuth } from "@/hooks/useAuth";
 import type { Personal, TipoPersonal } from "@/types/api";
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -48,6 +49,9 @@ interface PersonalViewProps {
 export function PersonalView({ establecimientoId }: PersonalViewProps) {
   const { data: session } = useSession();
   const token = (session as unknown as { accessToken?: string })?.accessToken;
+  const { roles } = useAuth();
+  // Solo responsable_registro y admin_general pueden crear recepcionistas (usuarios de sistema)
+  const canCrearRecepcionista = roles.includes("responsable_registro") || roles.includes("admin_general");
 
   const [items, setItems] = useState<Personal[]>([]);
   const [tiposPersonal, setTiposPersonal] = useState<TipoPersonal[]>([]);
@@ -453,6 +457,7 @@ export function PersonalView({ establecimientoId }: PersonalViewProps) {
         item={editingItem}
         existingCI={existingCI}
         tiposPersonal={tiposPersonal}
+        canCrearRecepcionista={canCrearRecepcionista}
       />
 
       {/* Dialog credenciales recepcionista */}

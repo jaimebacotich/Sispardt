@@ -133,7 +133,7 @@
   }
 
   @page {
-    size: A4 landscape;
+    size: 216mm 330mm; /* Oficio — vertical (33cm largo) */
     margin: 10mm;
   }
 }

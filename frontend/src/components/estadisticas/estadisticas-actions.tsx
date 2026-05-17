@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Printer, FileDown, Loader2 } from "lucide-react";
-import { ExportButtons } from "@/components/shared";
 import { toast } from "sonner";
 
 export function EstadisticasActions() {
@@ -15,7 +14,9 @@ export function EstadisticasActions() {
 
   // ── Exportar PDF con html2canvas + jsPDF ─────────────────────────────────
   async function handleExportarPDF() {
-    const contenido = document.getElementById("estadisticas-contenido");
+    // Capturamos el wrapper completo (incluye encabezado + dashboard, excluye botones via print:hidden)
+    const contenido = document.getElementById("estadisticas-export-wrapper") ??
+                      document.getElementById("estadisticas-contenido");
     if (!contenido) {
       toast.error("No se encontró el contenido del dashboard.");
       return;
@@ -31,32 +32,53 @@ export function EstadisticasActions() {
         import("jspdf"),
       ]);
 
-      const bgColor =
-        window.getComputedStyle(document.body).backgroundColor || "#ffffff";
-
       const canvas = await html2canvas(contenido, {
         scale: 2,
         useCORS: true,
+        allowTaint: false,
         logging: false,
-        backgroundColor: bgColor,
+        // Fondo blanco explícito — las variables CSS de Tailwind no se resuelven bien
+        backgroundColor: "#ffffff",
+        imageTimeout: 0,
         ignoreElements: (el) =>
           el.classList.contains("print:hidden") ||
           el.getAttribute("data-html2canvas-ignore") === "true",
+        onclone: (_doc, element) => {
+          // Forzar fondo blanco en el clon para que los bg-card/bg-background
+          // con variables CSS queden opacos en la captura
+          element.style.backgroundColor = "#ffffff";
+          element.style.color = "#111111";
+          element.querySelectorAll<HTMLElement>("*").forEach((el) => {
+            const bg = window.getComputedStyle(el).backgroundColor;
+            // Reemplazar fondos transparentes por blanco
+            if (bg === "rgba(0, 0, 0, 0)" || bg === "transparent") {
+              el.style.backgroundColor = "#ffffff";
+            }
+          });
+        },
       });
 
       const imgW = canvas.width / 2;   // escala 2 → tamaño real en px
       const imgH = canvas.height / 2;
 
+      // Margen en px (en el espacio del documento)
+      const margin = 24;
+
       const pdf = new jsPDF({
         orientation: imgW > imgH ? "landscape" : "portrait",
         unit: "px",
-        format: [imgW, imgH],
+        format: [imgW + margin * 2, imgH + margin * 2],
       });
 
+      // Fondo blanco del PDF
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, imgW + margin * 2, imgH + margin * 2, "F");
+
+      // Imagen desplazada por el margen
       pdf.addImage(
-        canvas.toDataURL("image/jpeg", 0.92),
-        "JPEG",
-        0, 0, imgW, imgH
+        canvas.toDataURL("image/png"),
+        "PNG",
+        margin, margin, imgW, imgH
       );
 
       const fecha = new Date().toISOString().slice(0, 10);
@@ -94,10 +116,6 @@ export function EstadisticasActions() {
         )}
       </button>
 
-      {/* Botón Excel — próximamente */}
-      <ExportButtons
-        onExcel={() => toast.info("Exportación Excel próximamente")}
-      />
     </div>
   );
 }

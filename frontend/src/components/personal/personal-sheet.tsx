@@ -43,6 +43,7 @@ interface PersonalSheetProps {
   item?: Personal | null;
   existingCI: string[];
   tiposPersonal: TipoPersonal[];
+  canCrearRecepcionista?: boolean; // false para tecnico_registro
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ export function PersonalSheet({
   item,
   existingCI,
   tiposPersonal,
+  canCrearRecepcionista = true,
 }: PersonalSheetProps) {
   const isEdit = !!item;
   const yaEsUsuarioSistema = !!item?.keycloakUserId;
@@ -254,7 +256,8 @@ export function PersonalSheet({
             )}
           />
 
-          {/* Usuario de sistema */}
+          {/* Usuario de sistema — solo visible para responsable_registro y admin_general */}
+          {canCrearRecepcionista && (
           <div className="space-y-2">
             <label className="flex items-start gap-3 cursor-pointer group">
               <input
@@ -329,6 +332,7 @@ export function PersonalSheet({
               </div>
             )}
           </div>
+          )} {/* fin canCrearRecepcionista */}
         </form>
 
         {/* Footer */}
