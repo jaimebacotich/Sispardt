@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Sun, Moon, Wifi, WifiOff } from "lucide-react";
+import { Sun, Moon, Wifi, WifiOff, KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useEstablecimientoActual } from "@/hooks/useEstablecimientoActual";
@@ -94,6 +94,15 @@ export function Header() {
             {user.fullName || user.username}
           </span>
         )}
+
+        {/* Cambiar contraseña (sin funcionalidad aún) */}
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          title="Cambiar contraseña"
+          aria-label="Cambiar contraseña"
+        >
+          <KeyRound size={16} />
+        </button>
 
         {/* Dark mode toggle */}
         {mounted && (
