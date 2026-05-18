@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 import { useEstablecimientoActual } from "@/hooks/useEstablecimientoActual";
+import { useFechasPendientes } from "@/hooks/useMovimientos";
 
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK_API === "true";
 
@@ -83,6 +84,7 @@ interface NavLeaf {
   href: string;
   icon: React.ElementType;
   roles: Role[];
+  badge?: number; // badge de alerta (ej: pendientes fuera de plazo)
 }
 
 interface NavGroup {
@@ -196,7 +198,7 @@ const ROLE_LABELS: Record<Role, string> = {
 };
 
 // ── Componente hoja ──────────────────────────────────────────────────────────
-function NavLeafItem({ item, pathname }: { item: NavLeaf; pathname: string }) {
+function NavLeafItem({ item, pathname, badge }: { item: NavLeaf; pathname: string; badge?: number }) {
   const Icon = item.icon;
   const isActive =
     item.href === "/dashboard"
@@ -223,7 +225,12 @@ function NavLeafItem({ item, pathname }: { item: NavLeaf; pathname: string }) {
         size={18}
       />
       <span className="flex-1 truncate">{item.label}</span>
-      {isActive && <ChevronRight size={14} className="opacity-60" />}
+      {badge && badge > 0 && (
+        <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-status-mantenimiento text-white text-[10px] font-bold flex items-center justify-center leading-none">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+      {!badge && isActive && <ChevronRight size={14} className="opacity-60" />}
     </Link>
   );
 }
@@ -293,6 +300,10 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, roles, isLoading } = useAuth();
   const { nombre: establecimientoNombre } = useEstablecimientoActual();
+  const esRecepcionista = roles.includes("recepcionista");
+  // Pendientes fuera de plazo — solo para recepcionistas
+  const { data: pendientesFuera = [] } = useFechasPendientes();
+  const badgeFueraPlazo = esRecepcionista ? pendientesFuera.length : 0;
 
   const visible = NAV_ENTRIES.filter((entry) =>
     entry.roles.length === 0 || entry.roles.some((r) => roles.includes(r))
@@ -326,7 +337,12 @@ export function Sidebar() {
             );
           }
           return (
-            <NavLeafItem key={entry.href} item={entry as NavLeaf} pathname={pathname} />
+            <NavLeafItem
+              key={entry.href}
+              item={entry as NavLeaf}
+              pathname={pathname}
+              badge={entry.href === "/reporte/fuera-de-plazo" ? badgeFueraPlazo : undefined}
+            />
           );
         })}
       </nav>

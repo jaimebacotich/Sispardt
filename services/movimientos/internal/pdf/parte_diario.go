@@ -136,23 +136,12 @@ func GenerarParteDiario(w io.Writer, reporte *domain.ReporteParteDiario, info In
 	pdf.SetTextColor(0, 0, 0)
 	pdf.CellFormat(0, 4.5, "Fecha de reporte: "+reporte.Fecha, "", 1, "L", false, 0, "")
 
-	// Fecha y hora de presentación + condición en la misma línea
-	pageW, _ := pdf.GetPageSize()
-	pdf.SetFont("DejaVu", "", 7.0)
-	pdf.SetTextColor(60, 60, 60)
-	pdf.CellFormat((pageW-marginPD*2)/2, 4.0,
-		"Presentación: "+reporte.FechaHoraGeneracion, "", 0, "L", false, 0, "")
-
-	// Condición con color según estado
-	if reporte.Condicion == "Fuera de Plazo" {
-		pdf.SetTextColor(220, 80, 20) // naranja
-	} else {
-		pdf.SetTextColor(22, 160, 90) // verde
-	}
+	// Fecha/hora de presentación y condición en la misma línea, izquierda, negro negrita
 	pdf.SetFont("DejaVu", "B", 7.0)
-	pdf.CellFormat((pageW-marginPD*2)/2, 4.0,
-		"Condición: "+reporte.Condicion, "", 1, "R", false, 0, "")
 	pdf.SetTextColor(0, 0, 0)
+	pdf.CellFormat(0, 4.0,
+		"Presentación: "+reporte.FechaHoraGeneracion+"   |   Condición: "+reporte.Condicion,
+		"", 1, "L", false, 0, "")
 	pdf.Ln(2)
 
 	// ── Ingresos ───────────────────────────────────────────────────────────────
