@@ -133,10 +133,16 @@ BEGIN
         RETURN NEW;
     END IF;
 
+    -- Contar huéspedes que estaban en la habitación durante la fecha del parte:
+    -- llegaron en esa fecha o antes, y no se fueron antes de que terminara ese día.
+    -- Corrección: registro fuera de plazo no debe comparar con ocupación actual
+    -- sino con la ocupación histórica de la fecha_reporte del nuevo parte.
     SELECT COUNT(*) INTO v_ocupacion_actual
     FROM public.partes_diarios
     WHERE habitacion_id = NEW.habitacion_id
-      AND salida_at IS NULL;
+      AND estado_operativo = 'ACTIVO'
+      AND fecha_reporte <= NEW.fecha_reporte
+      AND (salida_at IS NULL OR (salida_at AT TIME ZONE 'America/La_Paz')::date > NEW.fecha_reporte);
 
     IF (v_ocupacion_actual >= v_capacidad_maxima) THEN
         RAISE EXCEPTION 'Capacidad maxima de la habitacion superada. Ocupacion actual: %, Limite: %', v_ocupacion_actual, v_capacidad_maxima;

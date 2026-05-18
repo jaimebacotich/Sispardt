@@ -113,17 +113,23 @@ export function EstadisticasDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- estList se estabiliza a través de react-query cache
   const estList: Establecimiento[] = establecimientos?.data ?? [];
 
-  // KPI de infra (no dependen del período)
-  const estActivos = useMemo(() => estList.filter((e) => e.activo).length, [estList]);
-  const estTotal = estList.length;
-  const capacidadHotelera = useMemo(() => estList.reduce((s, e) => s + e.capacidadHospedaje, 0), [estList]);
+  // Lista efectiva para KPIs: si hay establecimiento específico, reducir a ese solo
+  const estListKpis = useMemo(
+    () => establecimientoId ? estList.filter((e) => e.id === establecimientoId) : estList,
+    [establecimientoId, estList]
+  );
+
+  // KPI de infra (respetan el filtro en cascada municipio → establecimiento)
+  const estActivos = useMemo(() => estListKpis.filter((e) => e.activo).length, [estListKpis]);
+  const estTotal = estListKpis.length;
+  const capacidadHotelera = useMemo(() => estListKpis.reduce((s, e) => s + e.capacidadHospedaje, 0), [estListKpis]);
   const licVigentes = useMemo(
     () =>
-      estList.filter((e) =>
+      estListKpis.filter((e) =>
         e.tieneLicenciaTuristica &&
         (e.fechaVencimientoLicencia ? new Date(e.fechaVencimientoLicencia) >= new Date() : true)
       ).length,
-    [estList]
+    [estListKpis]
   );
 
   // Municipio seleccionado sin establecimientos = no hay datos que mostrar
