@@ -472,6 +472,22 @@ jobs:
 
           echo "Smoke Test completado — todos los endpoints responden correctamente."
 
+      # ── Rollback automático si el Smoke Test falla ───────────────────────────
+      - name: Rollback automático (Smoke Test fallido)
+        if: failure() && steps.rollouts.conclusion == 'success'
+        run: |
+          echo "Smoke Test fallido — ejecutando rollback automático..."
+          for dep in svc-establecimientos svc-movimientos svc-auditoria-sesiones svc-frontend svc-kafka-consumer; do
+            echo "  → rollback $dep"
+            kubectl rollout undo deployment/$dep -n sispardt || true
+          done
+          echo "Esperando que el rollback complete..."
+          for dep in svc-establecimientos svc-movimientos svc-auditoria-sesiones svc-frontend svc-kafka-consumer; do
+            kubectl rollout status deployment/$dep -n sispardt --timeout=3m || true
+          done
+          echo "Rollback completado. Estado final:"
+          kubectl get pods -n sispardt
+
       - name: Resumen del deploy
         if: always()
         run: |
