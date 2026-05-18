@@ -157,6 +157,6 @@
 
   @page {
     size: 216mm 279mm; /* Carta / Letter — vertical */
-    margin: 8mm;
+    margin: 6mm 8mm 2mm 8mm; /* top right bottom left — margen inferior mínimo */
   }
 }
