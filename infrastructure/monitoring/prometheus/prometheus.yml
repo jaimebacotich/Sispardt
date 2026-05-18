@@ -1,5 +1,6 @@
 # ============================================================
 # SISPARDT - Prometheus scrape configuration
+# Sistema completo con CI/CD OK1
 # ============================================================
 
 global:
