@@ -22,7 +22,7 @@ FROM alpine:3.21
 # ca-certificates: para llamadas HTTPS a Keycloak JWKS
 # tzdata: para timezone America/La_Paz
 # wget: para healthcheck
-RUN apk add --no-cache ca-certificates tzdata wget \
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata wget \
     && update-ca-certificates
 
 ENV TZ=America/La_Paz

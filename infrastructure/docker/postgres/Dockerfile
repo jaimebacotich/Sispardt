@@ -7,7 +7,7 @@ FROM postgres:17.2-alpine AS builder
 
 ARG PGPARTMAN_VERSION=5.2.0
 
-RUN apk add --no-cache curl make build-base \
+RUN apk upgrade --no-cache && apk add --no-cache curl make build-base \
     && curl -fsSL \
         "https://github.com/pgpartman/pg_partman/archive/v${PGPARTMAN_VERSION}.tar.gz" \
         | tar xz -C /tmp \
