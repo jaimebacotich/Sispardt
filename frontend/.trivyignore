@@ -43,3 +43,23 @@ GHSA-h25m-26qc-wcjf
 # Condición para levantar: Al actualizar tailwindcss, eslint-config-next y
 #   @dotenvx/dotenvx a versiones con picomatch≥2.3.2 / ≥4.0.4
 CVE-2026-33671
+
+# CVE-2026-44573 — Next.js Middleware/Proxy bypass in Pages Router
+# CVE-2026-44578 — Next.js SSRF in WebSocket upgrades
+# GHSA-8h8q-6873-q5fj — Next.js DoS with Server Components
+# GHSA-q4gf-8mx6-v5v3 — Next.js DoS with Server Components
+# Severidad: HIGH
+# Biblioteca afectada: next@14.2.35
+# Fix disponible: Solo en Next.js >= 15.5.15 / 16.x (migración mayor)
+# Justificación:
+#   Las correcciones requieren migrar de Next.js 14 a 15/16, lo que implica
+#   cambios incompatibles (sistema de rutas, Server Components, configuración).
+#   La migración está planificada pero fuera del alcance del sprint actual.
+#   El despliegue opera en red interna controlada sin exposición pública directa,
+#   reduciendo el riesgo operativo inmediato.
+# Revisado por: @jaimebacotich — 2026-05-18
+# Condición para levantar: Al migrar a Next.js 15.x o superior
+CVE-2026-44573
+CVE-2026-44578
+GHSA-8h8q-6873-q5fj
+GHSA-q4gf-8mx6-v5v3
