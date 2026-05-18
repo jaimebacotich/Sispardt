@@ -205,7 +205,13 @@ services:
       KC_SECRET_SISTEMA_SVC:      ${KC_SECRET_SISTEMA_SVC:?Variable KC_SECRET_SISTEMA_SVC requerida}
       KC_SECRET_AUD_SVC:          ${KC_SECRET_AUD_SVC:?Variable KC_SECRET_AUD_SVC requerida}
       APP_HOST:                   ${APP_HOST:-localhost}
-      APP_PORT:                ${APP_PORT:-3100}
+      APP_PORT:                   ${APP_PORT:-3100}
+      KC_ADMIN_NOMBRE:            ${KC_ADMIN_NOMBRE:-Admin}
+      KC_ADMIN_APELLIDO:          ${KC_ADMIN_APELLIDO:-SISPARDT}
+      KC_RESP_NOMBRE:             ${KC_RESP_NOMBRE:-Responsable}
+      KC_RESP_APELLIDO:           ${KC_RESP_APELLIDO:-Registro}
+      KC_TEC_NOMBRE:              ${KC_TEC_NOMBRE:-Tecnico}
+      KC_TEC_APELLIDO:            ${KC_TEC_APELLIDO:-Registro}
     volumes:
       - ./infrastructure/keycloak/init-keycloak.sh:/scripts/init-keycloak.sh:ro
     networks:

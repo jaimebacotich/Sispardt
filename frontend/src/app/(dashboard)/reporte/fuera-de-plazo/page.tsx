@@ -155,7 +155,7 @@ export default function ReporteFueraDePlazoPage() {
           ) : (
             <>
               <p className="text-sm font-semibold text-foreground">
-                Reporte Fuera de Plazo
+                Registro de Check-in y Check-out Fuera de Plazo
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Selecciona una fecha de la tabla para comenzar a registrar partes

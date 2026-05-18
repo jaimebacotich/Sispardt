@@ -18,7 +18,9 @@ type ReporteFilaParteDiario struct {
 }
 
 type ReporteParteDiario struct {
-	Fecha    string                   `json:"fecha"`    // DD/MM/YYYY
-	Ingresos []ReporteFilaParteDiario `json:"ingresos"`
-	Salidas  []ReporteFilaParteDiario `json:"salidas"`
+	Fecha               string                   `json:"fecha"`               // DD/MM/YYYY
+	FechaHoraGeneracion string                   `json:"fechaHoraGeneracion"` // DD/MM/YYYY HH:MM
+	Condicion           string                   `json:"condicion"`           // "En Plazo" | "Fuera de Plazo"
+	Ingresos            []ReporteFilaParteDiario `json:"ingresos"`
+	Salidas             []ReporteFilaParteDiario `json:"salidas"`
 }

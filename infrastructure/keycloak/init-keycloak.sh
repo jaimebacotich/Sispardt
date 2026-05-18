@@ -467,9 +467,17 @@ create_user() {
 # UUID institución (usuarios administrativos)
 INST_UUID="11111111-1111-1111-1111-111111111111"
 
-create_user "admin.sispardt" "Jaime" "Bacotich" "admin_general"        "${INST_UUID}"
-create_user "resp.registro"  "Maria" "Torres"   "responsable_registro" "${INST_UUID}"
-create_user "tec.registro"   "Luis"  "Rojas"    "tecnico_registro"     "${INST_UUID}"
+create_user "admin.sispardt" \
+    "${KC_ADMIN_NOMBRE:-Admin}"       "${KC_ADMIN_APELLIDO:-SISPARDT}" \
+    "admin_general"        "${INST_UUID}"
+
+create_user "resp.registro" \
+    "${KC_RESP_NOMBRE:-Responsable}"  "${KC_RESP_APELLIDO:-Registro}" \
+    "responsable_registro" "${INST_UUID}"
+
+create_user "tec.registro" \
+    "${KC_TEC_NOMBRE:-Tecnico}"       "${KC_TEC_APELLIDO:-Registro}" \
+    "tecnico_registro"     "${INST_UUID}"
 
 # ---- 12. Resumen ----
 log ""

@@ -94,15 +94,26 @@ func (s *ParteDiarioService) GetReportePorFecha(ctx context.Context, establecimi
 	if err != nil {
 		return nil, err
 	}
-	// Formatear fecha para el reporte: YYYY-MM-DD → DD/MM/YYYY
+	// Formatear fecha del reporte: YYYY-MM-DD → DD/MM/YYYY
 	fechaDisplay := fecha
+	condicion := "En Plazo"
 	if t, e := time.Parse("2006-01-02", fecha); e == nil {
 		fechaDisplay = t.Format("02/01/2006")
+		// Más de 48 horas después del día del reporte → Fuera de Plazo
+		if time.Now().After(t.Add(48 * time.Hour)) {
+			condicion = "Fuera de Plazo"
+		}
 	}
+	// Fecha y hora de generación del PDF (hora Bolivia)
+	loc := boliviaLoc()
+	fechaHoraGen := time.Now().In(loc).Format("02/01/2006 15:04")
+
 	return &domain.ReporteParteDiario{
-		Fecha:    fechaDisplay,
-		Ingresos: ingresos,
-		Salidas:  salidas,
+		Fecha:               fechaDisplay,
+		FechaHoraGeneracion: fechaHoraGen,
+		Condicion:           condicion,
+		Ingresos:            ingresos,
+		Salidas:             salidas,
 	}, nil
 }
 
