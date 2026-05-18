@@ -926,7 +926,22 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, estIDs []stri
 			(SELECT total_checkouts  FROM pernoctes)   AS total_checkouts,
 			(SELECT total_pernoctes  FROM pernoctes)   AS total_pernoctes,
 			COALESCE((SELECT capacidad_total FROM capacidad), 0) AS capacidad_total,
-			COALESCE((SELECT COUNT(DISTINCT fecha_reporte) FROM ocupacion_diaria), 0) AS dias_con_datos`
+			COALESCE((SELECT COUNT(DISTINCT fecha_reporte) FROM ocupacion_diaria), 0) AS dias_con_datos,
+			-- Huéspedes activos AHORA (sin salida_at), independiente del período seleccionado
+			COALESCE((
+			    SELECT COUNT(*)
+			    FROM public.partes_diarios
+			    WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
+			      AND estado_operativo = 'ACTIVO'
+			      AND salida_at IS NULL
+			), 0) AS total_activos,
+			-- Pico de ocupación: máximo de huéspedes en un solo día del período
+			COALESCE((
+			    SELECT MAX(total_huespedes)
+			    FROM public.vw_ocupacion_diaria
+			    WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
+			      AND fecha_reporte BETWEEN $2 AND $3
+			), 0) AS pico_ocupacion`
 
 	var res domain.ResumenEstadisticas
 	err := r.statsPool.QueryRow(ctx, sql, estIDsParam(estIDs), desde, hasta).Scan(
@@ -939,6 +954,8 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, estIDs []stri
 		&res.TotalPernoctes,
 		&res.CapacidadTotal,
 		&res.DiasConDatos,
+		&res.TotalActivos,
+		&res.PicoOcupacion,
 	)
 	if err != nil {
 		return domain.ResumenEstadisticas{}, fmt.Errorf("resumen estadisticas: %w", err)

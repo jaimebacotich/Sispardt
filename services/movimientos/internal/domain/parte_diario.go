@@ -255,6 +255,8 @@ type ResumenEstadisticas struct {
 	TotalPernoctes    int64   `json:"totalPernoctes"`
 	CapacidadTotal    int64   `json:"capacidadTotal"`
 	DiasConDatos      int     `json:"diasConDatos"`
+	TotalActivos      int64   `json:"totalActivos"`   // huéspedes activos ahora (sin checkout), independiente del período
+	PicoOcupacion     int64   `json:"picoOcupacion"`  // máximo de huéspedes en un solo día del período
 }
 
 type NacionalidadStat struct {
