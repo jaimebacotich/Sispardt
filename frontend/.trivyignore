@@ -63,3 +63,38 @@ CVE-2026-44573
 CVE-2026-44578
 GHSA-8h8q-6873-q5fj
 GHSA-q4gf-8mx6-v5v3
+
+# GHSA-9g9p-9gw9-jx7f — Next.js DoS via Image Optimizer remotePatterns
+# GHSA-ggv3-7p47-pfv8 — Next.js HTTP request smuggling in rewrites
+# GHSA-3x4c-7xq6-9pq8 — Next.js unbounded next/image disk cache growth
+# GHSA-3g8h-86w9-wvmq — Next.js Middleware/Proxy cache poisoning
+# GHSA-ffhc-5mcf-pf4q — Next.js XSS en App Router con CSP nonces
+# GHSA-vfv6-92ff-j949 — Next.js cache poisoning en RSC cache-busting
+# GHSA-gx5p-jg67-6x7h — Next.js XSS en beforeInteractive scripts
+# GHSA-h64f-5h5j-jqjh — Next.js DoS en Image Optimization API
+# GHSA-c4j6-fc7j-m34r — Next.js SSRF en WebSocket upgrades
+# GHSA-wfc6-r584-vfw7 — Next.js cache poisoning en RSC responses
+# GHSA-36qx-fr4f-26g5 — Next.js Middleware bypass en Pages Router i18n
+# GHSA-qx2v-qp2m-jg93 — PostCSS XSS via Unescaped </style> (dep de next@14)
+# Severidad: HIGH/MODERATE
+# Biblioteca afectada: next@14.2.35 y postcss (dependencia de next)
+# Fix disponible: Solo en Next.js >= 16.x (migración mayor con breaking changes)
+# Justificación:
+#   Todas las correcciones requieren migrar de Next.js 14 a 16, cambio mayor que
+#   implica incompatibilidades en el sistema de rutas, Server Components y configuración.
+#   El despliegue opera en red interna controlada sin exposición pública directa.
+#   La migración está planificada fuera del alcance del sprint actual.
+# Revisado por: @jaimebacotich — 2026-05-24
+# Condición para levantar: Al migrar a Next.js 16.x
+GHSA-9g9p-9gw9-jx7f
+GHSA-ggv3-7p47-pfv8
+GHSA-3x4c-7xq6-9pq8
+GHSA-3g8h-86w9-wvmq
+GHSA-ffhc-5mcf-pf4q
+GHSA-vfv6-92ff-j949
+GHSA-gx5p-jg67-6x7h
+GHSA-h64f-5h5j-jqjh
+GHSA-c4j6-fc7j-m34r
+GHSA-wfc6-r584-vfw7
+GHSA-36qx-fr4f-26g5
+GHSA-qx2v-qp2m-jg93
