@@ -3,19 +3,149 @@
   "uid": "sispardt-overview",
   "tags": ["sispardt"],
   "timezone": "America/La_Paz",
-  "refresh": "30s",
+  "refresh": "5s",
   "schemaVersion": 39,
-  "time": { "from": "now-1h", "to": "now" },
+  "time": { "from": "now-2m", "to": "now" },
   "panels": [
+    {
+      "id": 8,
+      "title": "RAM disponible",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100",
+          "legendFormat": "RAM disponible %"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "id": 7,
+      "title": "CPU del host",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[30s])) * 100)",
+          "legendFormat": "CPU %"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "id": 11,
+      "title": "Disco del host — uso %",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "100 - (node_filesystem_avail_bytes{mountpoint=\"/var/lib\"} / node_filesystem_size_bytes{mountpoint=\"/var/lib\"} * 100)",
+          "legendFormat": "Disco usado %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": 0  },
+              { "color": "yellow", "value": 70 },
+              { "color": "red",    "value": 90 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line+area" } }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Keycloak — autenticaciones/min",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "rate(keycloak_credentials_password_hashing_validations_total{outcome=\"valid\",realm=\"sispardt\"}[1m])",
+          "legendFormat": "Logins exitosos/min"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "rate(keycloak_credentials_password_hashing_validations_total{outcome=\"invalid\",realm=\"sispardt\"}[1m])",
+          "legendFormat": "Intentos fallidos/min"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Disco del host — espacio libre",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 12, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "node_filesystem_avail_bytes{mountpoint=\"/var/lib\"}",
+          "legendFormat": "Libre"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": 0           },
+              { "color": "yellow", "value": 5368709120  },
+              { "color": "green",  "value": 10737418240 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Disco del host — total",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 12, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
+          "expr": "node_filesystem_size_bytes{mountpoint=\"/var/lib\"}",
+          "legendFormat": "Total"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "fixed", "fixedColor": "blue" }
+        }
+      }
+    },
     {
       "id": 1,
       "title": "Servicios activos",
       "type": "stat",
-      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "gridPos": { "x": 20, "y": 12, "w": 4, "h": 4 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "count(up{job=~\"svc-.*\"} == 1)",
+          "expr": "sum(up{job=~\"svc-.*\"})",
           "legendFormat": "Servicios up"
         }
       ],
@@ -25,9 +155,9 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": 0 },
+              { "color": "red",    "value": 0 },
               { "color": "yellow", "value": 1 },
-              { "color": "green", "value": 2 }
+              { "color": "green",  "value": 2 }
             ]
           }
         }
@@ -37,7 +167,7 @@
       "id": 2,
       "title": "Requests/segundo — API Gateway",
       "type": "timeseries",
-      "gridPos": { "x": 4, "y": 0, "w": 10, "h": 8 },
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
@@ -50,7 +180,7 @@
       "id": 3,
       "title": "Latencia p95 — requests HTTP",
       "type": "timeseries",
-      "gridPos": { "x": 14, "y": 0, "w": 10, "h": 8 },
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
@@ -66,11 +196,11 @@
       "id": 4,
       "title": "Conexiones activas — PostgreSQL Establecimientos",
       "type": "stat",
-      "gridPos": { "x": 0, "y": 4, "w": 4, "h": 4 },
+      "gridPos": { "x": 12, "y": 12, "w": 4, "h": 4 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "pg_stat_activity_count{job=\"postgres-establecimientos\", state=\"active\"}",
+          "expr": "sum(pg_stat_activity_count{job=\"postgres-establecimientos\", state=\"active\"})",
           "legendFormat": "Activas"
         }
       ]
@@ -79,11 +209,11 @@
       "id": 5,
       "title": "Conexiones activas — PostgreSQL Movimientos",
       "type": "stat",
-      "gridPos": { "x": 4, "y": 8, "w": 4, "h": 4 },
+      "gridPos": { "x": 16, "y": 12, "w": 4, "h": 4 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "pg_stat_activity_count{job=\"postgres-movimientos\", state=\"active\"}",
+          "expr": "sum(pg_stat_activity_count{job=\"postgres-movimientos\", state=\"active\"})",
           "legendFormat": "Activas"
         }
       ]
@@ -92,7 +222,7 @@
       "id": 6,
       "title": "Errores 4xx/5xx — Traefik",
       "type": "timeseries",
-      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 6 },
+      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 6 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
@@ -110,81 +240,6 @@
           }
         }
       }
-    },
-    {
-      "id": 7,
-      "title": "CPU del host",
-      "type": "timeseries",
-      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 6 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)",
-          "legendFormat": "CPU %"
-        }
-      ],
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
-    },
-    {
-      "id": 8,
-      "title": "RAM disponible",
-      "type": "timeseries",
-      "gridPos": { "x": 0, "y": 14, "w": 8, "h": 6 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100",
-          "legendFormat": "RAM disponible %"
-        }
-      ],
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
-    },
-    {
-      "id": 9,
-      "title": "Lag del consumer Kafka (replica_cache)",
-      "type": "stat",
-      "gridPos": { "x": 8, "y": 14, "w": 6, "h": 6 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "kafka_consumergroup_lag{consumergroup=\"sispardt-replica-consumer\"}",
-          "legendFormat": "{{topic}}"
-        }
-      ],
-      "options": {
-        "reduceOptions": { "calcs": ["max"] },
-        "colorMode": "background"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": 0 },
-              { "color": "yellow", "value": 100 },
-              { "color": "red", "value": 1000 }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "id": 10,
-      "title": "Keycloak — autenticaciones/min",
-      "type": "timeseries",
-      "gridPos": { "x": 14, "y": 14, "w": 10, "h": 6 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "rate(keycloak_credentials_password_hashing_validations_total{outcome=\"valid\",realm=\"sispardt\"}[1m])",
-          "legendFormat": "Logins exitosos/min"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "rate(keycloak_credentials_password_hashing_validations_total{outcome=\"invalid\",realm=\"sispardt\"}[1m])",
-          "legendFormat": "Intentos fallidos/min"
-        }
-      ]
     }
   ]
 }
