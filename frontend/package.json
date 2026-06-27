@@ -40,7 +40,8 @@
   "overrides": {
     "router": {
       "path-to-regexp": "8.4.0"
-    }
+    },
+    "hono": "4.12.25"
   },
   "devDependencies": {
     "@types/node": "^20.19.37",
