@@ -20,7 +20,7 @@ export interface UserSession {
 declare module "next-auth" {
   interface Session {
     user: UserSession;
-    error?: "RefreshTokenExpired";
+    error?: "RefreshAccessTokenError";
   }
   interface JWT {
     sub: string;
@@ -32,6 +32,6 @@ declare module "next-auth" {
     accessToken: string;
     refreshToken: string;
     expiresAt: number;
-    error?: "RefreshTokenExpired";
+    error?: "RefreshAccessTokenError";
   }
 }

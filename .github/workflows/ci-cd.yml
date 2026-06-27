@@ -401,6 +401,7 @@ jobs:
         run: |
           kubectl apply -f k8s/establecimientos/service.yaml
           kubectl apply -f k8s/movimientos/service.yaml
+          kubectl apply -f k8s/movimientos/hpa.yaml
           kubectl apply -f k8s/auditoria-sesiones/service.yaml
           kubectl apply -f k8s/frontend/service.yaml
           kubectl apply -f k8s/ingress.yaml
