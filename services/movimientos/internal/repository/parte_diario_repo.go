@@ -635,6 +635,31 @@ func (r *ParteDiarioRepo) Anular(ctx context.Context, tx pgx.Tx, id string) erro
 
 // ─── Cierres ──────────────────────────────────────────────────────────────────
 
+func (r *ParteDiarioRepo) PreviewCierre(ctx context.Context, establecimientoID, fecha string) (checkins, checkouts, huespedes int, err error) {
+	err = WithRLS(ctx, r.pool, establecimientoID, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx,
+			`SELECT COUNT(*) FROM public.partes_diarios WHERE establecimiento_id=$1 AND fecha_reporte=$2 AND estado_operativo='ACTIVO'`,
+			establecimientoID, fecha,
+		).Scan(&checkins); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(ctx,
+			`SELECT COUNT(*) FROM public.partes_diarios WHERE establecimiento_id=$1 AND (salida_at AT TIME ZONE 'America/La_Paz')::date=$2::date AND estado_operativo='ACTIVO'`,
+			establecimientoID, fecha,
+		).Scan(&checkouts); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(ctx,
+			`SELECT COUNT(*) FROM public.partes_diarios WHERE establecimiento_id=$1 AND fecha_reporte=$2 AND estado_operativo='ACTIVO' AND salida_at IS NULL`,
+			establecimientoID, fecha,
+		).Scan(&huespedes); err != nil {
+			return err
+		}
+		return nil
+	})
+	return
+}
+
 func (r *ParteDiarioRepo) CreateCierre(ctx context.Context, tx pgx.Tx, establecimientoID, cerradoPor, username, nombre, apellido string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiario, error) {
 	var totalCheckins int
 	if err := tx.QueryRow(ctx,
@@ -783,7 +808,7 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 		FROM generate_series(
 			(SELECT fecha_inicio_operaciones FROM public.establecimientos_replica_cache
 			 WHERE establecimiento_id = $1),
-			CURRENT_DATE - INTERVAL '2 days',
+			(NOW() AT TIME ZONE 'America/La_Paz')::date - 2,
 			INTERVAL '1 day'
 		) AS d(fecha)
 		WHERE NOT EXISTS (
@@ -840,7 +865,7 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 // fecha de inicio de operaciones del establecimiento, ambas desde el servidor BD.
 func (r *ParteDiarioRepo) GetFechaCierreActual(ctx context.Context, establecimientoID string) (fechaAyer string, fechaInicio *string, err error) {
 	const sql = `
-		SELECT (CURRENT_DATE AT TIME ZONE 'America/La_Paz' - INTERVAL '1 day')::date::text,
+		SELECT ((NOW() AT TIME ZONE 'America/La_Paz')::date - 1)::text,
 		       (SELECT fecha_inicio_operaciones::text
 		        FROM public.establecimientos_replica_cache
 		        WHERE establecimiento_id = $1)`
@@ -971,7 +996,37 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, estIDs []stri
 			    FROM public.vw_ocupacion_diaria
 			    WHERE ($1::text IS NULL OR establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
 			      AND fecha_reporte BETWEEN $2 AND $3
-			), 0) AS pico_ocupacion`
+			), 0) AS pico_ocupacion,
+			-- Habitaciones disponibles (sin huéspedes activos ahora)
+			COALESCE((
+			    SELECT COUNT(*)
+			    FROM public.habitaciones_replica_cache hrc
+			    WHERE ($1::text IS NULL OR hrc.establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
+			      AND NOT EXISTS (
+			          SELECT 1 FROM public.partes_diarios pd
+			          WHERE pd.habitacion_id = hrc.habitacion_id
+			            AND pd.estado_operativo = 'ACTIVO'
+			            AND pd.salida_at IS NULL
+			      )
+			), 0) AS habitaciones_disponibles,
+			-- Capacidad disponible en personas (suma capacidad de habitaciones libres)
+			COALESCE((
+			    SELECT SUM(hrc.capacidad_calculada)
+			    FROM public.habitaciones_replica_cache hrc
+			    WHERE ($1::text IS NULL OR hrc.establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
+			      AND NOT EXISTS (
+			          SELECT 1 FROM public.partes_diarios pd
+			          WHERE pd.habitacion_id = hrc.habitacion_id
+			            AND pd.estado_operativo = 'ACTIVO'
+			            AND pd.salida_at IS NULL
+			      )
+			), 0) AS capacidad_disponible,
+			-- Total de habitaciones
+			COALESCE((
+			    SELECT COUNT(*)
+			    FROM public.habitaciones_replica_cache hrc
+			    WHERE ($1::text IS NULL OR hrc.establecimiento_id = ANY(string_to_array($1, ',')::uuid[]))
+			), 0) AS total_habitaciones`
 
 	var res domain.ResumenEstadisticas
 	err := r.statsPool.QueryRow(ctx, sql, estIDsParam(estIDs), desde, hasta).Scan(
@@ -986,6 +1041,9 @@ func (r *ParteDiarioRepo) ResumenEstadisticas(ctx context.Context, estIDs []stri
 		&res.DiasConDatos,
 		&res.TotalActivos,
 		&res.PicoOcupacion,
+		&res.HabitacionesDisponibles,
+		&res.CapacidadDisponible,
+		&res.TotalHabitaciones,
 	)
 	if err != nil {
 		return domain.ResumenEstadisticas{}, fmt.Errorf("resumen estadisticas: %w", err)

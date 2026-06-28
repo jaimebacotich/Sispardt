@@ -35,6 +35,9 @@ export const establecimientosApi = {
   create: (token: string, data: EstablecimientoCreate) =>
     apiClient.post<Establecimiento>("/api/v1/establecimientos", data, token),
 
+  update: (token: string, id: string, data: Partial<EstablecimientoCreate>) =>
+    apiClient.put<Establecimiento>(`/api/v1/establecimientos/${id}`, data, token),
+
   delete: (token: string, id: string) =>
     apiClient.delete<void>(`/api/v1/establecimientos/${id}`, token),
 

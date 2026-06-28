@@ -58,6 +58,7 @@ type UpdateEstablecimientoRequest struct {
 	Telefono                 *string  `json:"telefono"`
 	Email                    *string  `json:"email"`
 	EstadoAdmin              *string  `json:"estadoAdmin"`
+	FechaInicioOperaciones   *string  `json:"fechaInicioOperaciones"`
 	ServiciosIds             *[]int   `json:"serviciosIds"`
 }
 

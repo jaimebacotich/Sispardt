@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { FormField, FormSelect } from "@/components/shared";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ import {
   useLocalidades,
   useServicios,
 } from "@/hooks/useCatalogos";
-import { useEstablecimiento, useCreateEstablecimiento } from "@/hooks/useEstablecimientos";
+import { useEstablecimiento, useCreateEstablecimiento, useUpdateEstablecimiento } from "@/hooks/useEstablecimientos";
 import type { EstablecimientoCreate } from "@/types/api";
 
 // ── Mapa cargado dinámicamente (sin SSR) ─────────────────────────────────────
@@ -132,10 +132,11 @@ function Section({
 
 interface EstablecimientoFormProps {
   mode: "create" | "edit";
+  editId?: string;
   defaultValues?: Partial<FormData>;
 }
 
-export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoFormProps) {
+export function EstablecimientoForm({ mode, editId, defaultValues }: EstablecimientoFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState<string[]>(
@@ -153,6 +154,7 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
   const divisiones = divisionesAll.filter((d) => d.divisionPrincipalNombre === "Tarija");
 
   const mCreate = useCreateEstablecimiento();
+  const mUpdate = useUpdateEstablecimiento();
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -161,6 +163,7 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
     handleSubmit,
     watch,
     setValue,
+    reset,
   } = useForm<FormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(schema) as any,
@@ -184,6 +187,20 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
       ...defaultValues,
     },
   });
+
+  const initialResetDone = useRef(false);
+
+  useEffect(() => {
+    if (mode === "edit" && defaultValues) {
+      initialResetDone.current = false;
+      reset({ ...defaultValues } as FormData);
+      if ((defaultValues as { serviciosIds?: string[] })?.serviciosIds) {
+        setServiciosSeleccionados((defaultValues as { serviciosIds: string[] }).serviciosIds);
+      }
+      setTimeout(() => { initialResetDone.current = true; }, 0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, defaultValues]);
 
   const watchedClasificacion = watch("clasificacionId");
   const watchedDivision = watch("divisionSecundariaId");
@@ -216,15 +233,15 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
     [watchedDivision, localidadesAll, divisionIdsTarija]
   );
 
-  // Reset categoría when clasificación changes
+  // Reset categoría when clasificación changes (skip during initial edit load)
   useEffect(() => {
-    setValue("categoriaId", "");
+    if (initialResetDone.current) setValue("categoriaId", "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedClasificacion]);
 
-  // Reset localidad when división changes
+  // Reset localidad when división changes (skip during initial edit load)
   useEffect(() => {
-    setValue("localidadId", "");
+    if (initialResetDone.current) setValue("localidadId", "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedDivision]);
 
@@ -264,10 +281,9 @@ export function EstablecimientoForm({ mode, defaultValues }: EstablecimientoForm
       } as unknown as EstablecimientoCreate;
 
       if (mode === "create") {
-         await mCreate.mutateAsync(apiPayload);
-      } else {
-         // await update 
-         toast.success("Establecimiento actualizado exitosamente");
+        await mCreate.mutateAsync(apiPayload);
+      } else if (editId) {
+        await mUpdate.mutateAsync({ id: editId, data: apiPayload });
       }
 
       router.push("/establecimientos");
@@ -684,10 +700,11 @@ function EstablecimientoEditLoader({ id }: { id: string }) {
   return (
     <EstablecimientoForm
       mode="edit"
+      editId={id}
       defaultValues={{
         razonSocial: est.razonSocial,
         razonSocialCorta: est.razonSocialCorta,
-        propietarioNombre: est.propietarioNombre ?? "",
+        propietario: est.propietarioNombre ?? "",
         clasificacionId: est.clasificacionId ?? "",
         categoriaId: est.categoriaId ?? "",
         tieneLicenciaTuristica: est.tieneLicenciaTuristica,

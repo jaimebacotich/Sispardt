@@ -84,6 +84,25 @@ func (h *EstablecimientoHandler) Create(w http.ResponseWriter, r *http.Request) 
 	jsonCreated(w, result)
 }
 
+// Update PUT /api/v1/establecimientos/{id}
+func (h *EstablecimientoHandler) Update(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	id := chi.URLParam(r, "id")
+
+	var req domain.UpdateEstablecimientoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, http.StatusBadRequest, "cuerpo de solicitud inválido")
+		return
+	}
+
+	result, err := h.svc.Update(r.Context(), id, claims.Sub, r.RemoteAddr, req)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	jsonOK(w, result)
+}
+
 // Delete DELETE /api/v1/establecimientos/{id}
 func (h *EstablecimientoHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	claims := auth.FromContext(r.Context())

@@ -190,6 +190,16 @@ export function useFechaCierreActual() {
   });
 }
 
+// ── Preview de cierre (conteos del backend) ────────────────────────────────
+export function usePreviewCierre(fecha: string) {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: ["cierre-preview", fecha],
+    queryFn: () => movimientosApi.getPreviewCierre(accessToken!, fecha),
+    enabled: !USE_MOCK && !!accessToken && !!fecha,
+  });
+}
+
 // ── Fechas pendientes de cierre (fuera de plazo) ───────────────────────────
 export function useFechasPendientes() {
   const { accessToken } = useAuth();

@@ -270,6 +270,64 @@ func (r *EstablecimientoRepo) Create(ctx context.Context, tx pgx.Tx, req domain.
 	return r.GetByID(ctx, id)
 }
 
+func (r *EstablecimientoRepo) Update(ctx context.Context, tx pgx.Tx, id string, req domain.UpdateEstablecimientoRequest) (*domain.EstablecimientoResponse, error) {
+	sets := []string{}
+	args := []interface{}{}
+	idx := 1
+
+	add := func(col string, val interface{}) {
+		sets = append(sets, fmt.Sprintf("%s = $%d", col, idx))
+		args = append(args, val)
+		idx++
+	}
+
+	if req.NroLicencia != nil              { add("nro_licencia", *req.NroLicencia) }
+	if req.RazonSocial != nil              { add("razon_social", *req.RazonSocial) }
+	if req.Propietario != nil              { add("propietario", *req.Propietario) }
+	if req.LocalidadID != nil              { add("localidad_id", *req.LocalidadID) }
+	if req.CategoriaID != nil              { add("categoria_id", *req.CategoriaID) }
+	if req.TieneLicenciaVigente != nil     { add("tiene_licencia_vigente", *req.TieneLicenciaVigente) }
+	if req.FechaVencimientoLicencia != nil { add("fecha_vencimiento_licencia", *req.FechaVencimientoLicencia) }
+	if req.Direccion != nil                { add("direccion", *req.Direccion) }
+	if req.Latitud != nil                  { add("latitud", *req.Latitud) }
+	if req.Longitud != nil                 { add("longitud", *req.Longitud) }
+	if req.Telefono != nil                 { add("telefono", *req.Telefono) }
+	if req.Email != nil                    { add("email", *req.Email) }
+	if req.EstadoAdmin != nil              { add("estado_admin", *req.EstadoAdmin) }
+	if req.FechaInicioOperaciones != nil   { add("fecha_inicio_operaciones", *req.FechaInicioOperaciones) }
+
+	if len(sets) == 0 && req.ServiciosIds == nil {
+		return r.GetByID(ctx, id)
+	}
+
+	if len(sets) > 0 {
+		add("actualizado_at", "NOW()")
+		sql := fmt.Sprintf("UPDATE public.establecimientos SET %s WHERE id = $%d AND eliminado_at IS NULL",
+			strings.Join(sets, ", "), idx)
+		args = append(args, id)
+		tag, err := tx.Exec(ctx, sql, args...)
+		if err != nil {
+			return nil, fmt.Errorf("actualizar establecimiento: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return nil, fmt.Errorf("establecimiento no encontrado")
+		}
+	}
+
+	if req.ServiciosIds != nil {
+		if _, err := tx.Exec(ctx, "DELETE FROM public.establecimiento_servicios WHERE establecimiento_id = $1", id); err != nil {
+			return nil, fmt.Errorf("limpiar servicios: %w", err)
+		}
+		for _, sID := range *req.ServiciosIds {
+			if _, err := tx.Exec(ctx, "INSERT INTO public.establecimiento_servicios (establecimiento_id, servicio_id) VALUES ($1, $2)", id, sID); err != nil {
+				return nil, fmt.Errorf("crear relacion servicio %d: %w", sID, err)
+			}
+		}
+	}
+
+	return r.GetByID(ctx, id)
+}
+
 // ─── SoftDelete ───────────────────────────────────────────────────────────────
 
 func (r *EstablecimientoRepo) SoftDelete(ctx context.Context, tx pgx.Tx, id string) error {

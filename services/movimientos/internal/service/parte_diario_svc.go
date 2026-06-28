@@ -706,6 +706,10 @@ func (s *ParteDiarioService) GetFechaCierreActual(ctx context.Context, estableci
 	return s.repo.GetFechaCierreActual(ctx, establecimientoID)
 }
 
+func (s *ParteDiarioService) PreviewCierre(ctx context.Context, establecimientoID, fecha string) (checkins, checkouts, huespedes int, err error) {
+	return s.repo.PreviewCierre(ctx, establecimientoID, fecha)
+}
+
 func (s *ParteDiarioService) CreateCierre(ctx context.Context, userID, cerradoPor, username, firstName, lastName, clientIP, establecimientoID string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiarioResponse, error) {
 	if req.FechaReporte == "" {
 		return nil, fmt.Errorf("fechaReporte es requerida")

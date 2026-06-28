@@ -10,11 +10,14 @@ import {
   LogIn,
   LogOut,
   Building2,
-  BadgeCheck,
   Globe,
   DoorOpen,
+  DoorClosed,
   UserCheck,
   TrendingUp,
+  Percent,
+  ShieldAlert,
+  Hotel,
 } from "lucide-react";
 import { StatCard } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -123,17 +126,7 @@ export function EstadisticasDashboard() {
 
   // KPI de infra (respetan el filtro en cascada municipio → establecimiento)
   const estActivos = useMemo(() => estListKpis.filter((e) => e.activo).length, [estListKpis]);
-  const estTotal = estListKpis.length;
   const capacidadHotelera = useMemo(() => estListKpis.reduce((s, e) => s + e.capacidadHospedaje, 0), [estListKpis]);
-  const licVigentes = useMemo(
-    () =>
-      estListKpis.filter((e) =>
-        e.tieneLicenciaTuristica &&
-        (e.fechaVencimientoLicencia ? new Date(e.fechaVencimientoLicencia) >= new Date() : true)
-      ).length,
-    [estListKpis]
-  );
-
   // Municipio seleccionado sin establecimientos = no hay datos que mostrar
   const sinEstablecimientos = !!localidadId && !loadingEst && estList.length === 0;
 
@@ -297,20 +290,24 @@ export function EstadisticasDashboard() {
         </p>
       )}
 
-      {/* ── 12 KPI Cards — 6 columnas ───────────────────────────── */}
-      <div className="print-kpi-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 print:grid-cols-6 gap-3 print:gap-1.5">
-        <StatCard compact label="Check-ins"        value={resumen?.totalCheckins ?? 0}                   icon={LogIn}      iconColor="text-status-libre"   iconBg="bg-status-libre/10"   isLoading={loadingResumen} />
-        <StatCard compact label="Check-outs"       value={resumen?.totalCheckouts ?? 0}                  icon={LogOut}     iconColor="text-chart-2"        iconBg="bg-chart-2/10"        isLoading={loadingResumen} />
-        <StatCard compact label="Nacionales"       value={(resumen?.totalHuespedes ?? 0) - (resumen?.totalExtranjeros ?? 0)} icon={Users}      iconColor="text-primary"        iconBg="bg-primary/10"        isLoading={loadingResumen} />
-        <StatCard compact label="Extranjeros"      value={resumen?.totalExtranjeros ?? 0}               icon={Globe}      iconColor="text-chart-2"        iconBg="bg-chart-2/10"        isLoading={loadingResumen} />
-        <StatCard compact label="Ocupación Prom."  value={(resumen?.ocupacionPromedio ?? 0).toFixed(1)} suffix="%" icon={BedDouble}  iconColor="text-chart-3"        iconBg="bg-chart-3/10"        isLoading={loadingResumen} />
-        <StatCard compact label="Estadía Prom."    value={(resumen?.estadiaPromedioDias ?? 0).toFixed(1)} suffix=" noches" icon={Clock}   iconColor="text-chart-4"        iconBg="bg-chart-4/10"        isLoading={loadingResumen} />
-        <StatCard compact label="Huéspedes Ahora"  value={resumen?.totalActivos ?? 0} suffix=" personas" icon={UserCheck} iconColor="text-primary"        iconBg="bg-primary/10"        isLoading={loadingResumen} />
-        <StatCard compact label="Capac. Disponible" value={Math.max(0, capacidadHotelera - (resumen?.totalActivos ?? 0))} suffix=" personas" icon={DoorOpen} iconColor="text-status-libre" iconBg="bg-status-libre/10" isLoading={loadingResumen || loadingEst} />
-        <StatCard compact label="Capac. Hotelera"  value={capacidadHotelera} suffix=" camas"            icon={BedSingle}  iconColor="text-chart-5"        iconBg="bg-chart-5/10"        isLoading={loadingEst} />
-        <StatCard compact label="Pico Ocupación"   value={resumen?.picoOcupacion ?? 0} suffix=" pers./día"  icon={TrendingUp} iconColor="text-chart-3"        iconBg="bg-chart-3/10"        isLoading={loadingResumen} />
-        <StatCard compact label="Est. Activos"     value={`${estActivos}`} suffix={` / ${estTotal}`}     icon={Building2}  iconColor="text-primary"        iconBg="bg-primary/10"        isLoading={loadingEst} />
-        <StatCard compact label="Estab. con Lic."  value={`${licVigentes}`} suffix={` / ${estTotal}`}    icon={BadgeCheck} iconColor="text-status-libre"   iconBg="bg-status-libre/10"   isLoading={loadingEst} />
+      {/* ── 16 KPI Cards — 8 columnas ───────────────────────────── */}
+      <div className="print-kpi-grid grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 print:grid-cols-8 gap-3 print:gap-1.5">
+        <StatCard compact label="Check-ins"        value={resumen?.totalCheckins ?? 0}                                                              icon={LogIn}       iconColor="text-status-libre"          iconBg="bg-status-libre/10"          isLoading={loadingResumen} />
+        <StatCard compact label="Check-outs"       value={resumen?.totalCheckouts ?? 0}                                                             icon={LogOut}      iconColor="text-chart-2"               iconBg="bg-chart-2/10"               isLoading={loadingResumen} />
+        <StatCard compact label="Huésp. Ahora"     value={resumen?.totalActivos ?? 0} suffix=" pers."                                               icon={UserCheck}   iconColor="text-primary"               iconBg="bg-primary/10"               isLoading={loadingResumen} />
+        <StatCard compact label="Nacionales"       value={(resumen?.totalHuespedes ?? 0) - (resumen?.totalExtranjeros ?? 0)}                         icon={Users}       iconColor="text-primary"               iconBg="bg-primary/10"               isLoading={loadingResumen} />
+        <StatCard compact label="Extranjeros"      value={resumen?.totalExtranjeros ?? 0}                                                           icon={Globe}       iconColor="text-chart-2"               iconBg="bg-chart-2/10"               isLoading={loadingResumen} />
+        <StatCard compact label="Ocup. Prom."      value={(resumen?.ocupacionPromedio ?? 0).toFixed(1)} suffix="%"                                   icon={BedDouble}   iconColor="text-chart-3"               iconBg="bg-chart-3/10"               isLoading={loadingResumen} />
+        <StatCard compact label="Estadía Prom."    value={(resumen?.estadiaPromedioDias ?? 0).toFixed(1)} suffix=" noches"                           icon={Clock}       iconColor="text-chart-4"               iconBg="bg-chart-4/10"               isLoading={loadingResumen} />
+        <StatCard compact label="Pico Ocup."       value={resumen?.picoOcupacion ?? 0} suffix=" pers./día"                                          icon={TrendingUp}  iconColor="text-chart-3"               iconBg="bg-chart-3/10"               isLoading={loadingResumen} />
+        <StatCard compact label="Capac. Hot."      value={capacidadHotelera} suffix=" camas"                                                        icon={BedSingle}   iconColor="text-chart-5"               iconBg="bg-chart-5/10"               isLoading={loadingEst} />
+        <StatCard compact label="Capac. Disp."     value={resumen?.capacidadDisponible ?? 0} suffix=" pers."                                        icon={DoorOpen}    iconColor="text-status-libre"          iconBg="bg-status-libre/10"          isLoading={loadingResumen} />
+        <StatCard compact label="Hab. Disp."       value={resumen?.habitacionesDisponibles ?? 0} suffix=" hab."                                     icon={DoorClosed}  iconColor="text-status-libre"          iconBg="bg-status-libre/10"          isLoading={loadingResumen} />
+        <StatCard compact label="Hab. Ocup."       value={(resumen?.totalHabitaciones ?? 0) - (resumen?.habitacionesDisponibles ?? 0)} suffix=" hab." icon={Hotel}      iconColor="text-status-ocupada"        iconBg="bg-status-ocupada/10"        isLoading={loadingResumen} />
+        <StatCard compact label="Ocup. actual"    value={capacidadHotelera > 0 ? ((resumen?.totalActivos ?? 0) / capacidadHotelera * 100).toFixed(1) : "0.0"} suffix="% Pers."                              icon={Percent}     iconColor="text-chart-3"               iconBg="bg-chart-3/10"               isLoading={loadingResumen || loadingEst} />
+        <StatCard compact label="Dispo. ahora"    value={capacidadHotelera > 0 ? ((resumen?.capacidadDisponible ?? 0) / capacidadHotelera * 100).toFixed(1) : "0.0"} suffix="% Pers."                       icon={Percent}     iconColor="text-status-libre"          iconBg="bg-status-libre/10"          isLoading={loadingResumen || loadingEst} />
+        <StatCard compact label="% No disp."        value={capacidadHotelera > 0 ? (100 - (resumen?.totalActivos ?? 0) / capacidadHotelera * 100 - (resumen?.capacidadDisponible ?? 0) / capacidadHotelera * 100).toFixed(1) : "0.0"} suffix="% Pers." icon={ShieldAlert} iconColor="text-status-mantenimiento" iconBg="bg-status-mantenimiento/10" isLoading={loadingResumen || loadingEst} />
+        <StatCard compact label="Est. Activos"     value={estActivos}                                                icon={Building2}   iconColor="text-primary"               iconBg="bg-primary/10"               isLoading={loadingEst} />
       </div>
 
       {/* ── Gráficos fila 1: Tendencia Visitantes + Top Nac. ─────── */}

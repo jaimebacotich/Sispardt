@@ -628,7 +628,7 @@ WHERE NOT EXISTS (SELECT 1 FROM public.localidades WHERE division_secundaria_id 
 -- Arce
 SELECT id INTO v_prov_id FROM public.divisiones_secundarias WHERE division_principal_id = v_dep_id AND nombre = 'Arce';
 INSERT INTO public.localidades (division_secundaria_id, nombre, es_sistema)
-SELECT v_prov_id, m, true FROM unnest(ARRAY['Bermejo']) AS m
+SELECT v_prov_id, m, true FROM unnest(ARRAY['Bermejo','Padcaya']) AS m
 WHERE NOT EXISTS (SELECT 1 FROM public.localidades WHERE division_secundaria_id = v_prov_id AND nombre = m);
 
 -- Gran Chaco
@@ -646,7 +646,7 @@ WHERE NOT EXISTS (SELECT 1 FROM public.localidades WHERE division_secundaria_id 
 -- Avilés
 SELECT id INTO v_prov_id FROM public.divisiones_secundarias WHERE division_principal_id = v_dep_id AND nombre = 'Avilés';
 INSERT INTO public.localidades (division_secundaria_id, nombre, es_sistema)
-SELECT v_prov_id, m, true FROM unnest(ARRAY['Uriondo','Padcaya','Yunchará']) AS m
+SELECT v_prov_id, m, true FROM unnest(ARRAY['Uriondo','Yunchará']) AS m
 WHERE NOT EXISTS (SELECT 1 FROM public.localidades WHERE division_secundaria_id = v_prov_id AND nombre = m);
 
 -- Eustaquio Méndez

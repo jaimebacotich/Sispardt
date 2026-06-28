@@ -394,8 +394,11 @@ export interface ResumenEstadisticas {
   totalPernoctes: number;
   capacidadTotal: number;
   diasConDatos: number;
-  totalActivos: number;   // huéspedes activos ahora (sin checkout), independiente del período
-  picoOcupacion: number;  // máximo de huéspedes en un solo día del período
+  totalActivos: number;
+  picoOcupacion: number;
+  habitacionesDisponibles: number;
+  capacidadDisponible: number;
+  totalHabitaciones: number;
 }
 
 /** Respuesta del endpoint GET /api/v1/estadisticas/nacionalidades */

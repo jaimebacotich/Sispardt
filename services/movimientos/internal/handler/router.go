@@ -122,6 +122,7 @@ func NewRouter(
 
 			r.With(multiRol).Get("/", cierreHandler.List)
 			r.With(multiRol).Get("/fecha-cierre-actual", cierreHandler.FechaCierreActual)
+			r.With(multiRol).Get("/preview", cierreHandler.PreviewCierre)
 			// pendientes ANTES de /{fecha}
 			r.With(multiRol).Get("/pendientes", cierreHandler.Pendientes)
 			r.With(multiRol).Get("/{fecha}", cierreHandler.GetByFecha)

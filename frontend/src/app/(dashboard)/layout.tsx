@@ -13,14 +13,14 @@ export default async function DashboardLayout({
   if (!isMock && !session?.user) redirect("/login");
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden print:block">
       {/* Sidebar fijo — oculto en impresión */}
       <div className="print:hidden">
         <Sidebar />
       </div>
 
       {/* Contenido principal */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:w-full">
         {/* Header — oculto en impresión */}
         <div className="print:hidden">
           <Header />

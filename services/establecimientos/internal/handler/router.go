@@ -121,6 +121,12 @@ func NewRouter(
 			)).Post("/", estHandler.Create)
 
 			r.With(auth.RequireRole(
+				auth.RoleAdminGeneral,
+				auth.RoleResponsableRegistro,
+				auth.RoleTecnicoRegistro,
+			)).Put("/{id}", estHandler.Update)
+
+			r.With(auth.RequireRole(
 				auth.RoleResponsableRegistro,
 				auth.RoleTecnicoRegistro,
 			)).Group(func(r chi.Router) {

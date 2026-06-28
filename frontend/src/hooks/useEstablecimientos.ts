@@ -49,6 +49,21 @@ export function useCreateEstablecimiento() {
   });
 }
 
+export function useUpdateEstablecimiento() {
+  const { accessToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<EstablecimientoCreate> }) =>
+      establecimientosApi.update(accessToken!, id, data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.establecimientos });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.establecimiento(variables.id) });
+      toast.success("Establecimiento actualizado exitosamente");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
 export function useDeleteEstablecimiento() {
   const { accessToken } = useAuth();
   const qc = useQueryClient();

@@ -81,6 +81,9 @@ export const movimientosApi = {
   getFechaCierreActual: (token: string) =>
     apiClient.get<{ fechaCierre: string; fechaInicioOperaciones: string | null }>("/api/v1/cierres/fecha-cierre-actual", token),
 
+  getPreviewCierre: (token: string, fecha: string) =>
+    apiClient.get<{ totalCheckins: number; totalCheckouts: number; huespedes: number }>(`/api/v1/cierres/preview?fecha=${fecha}`, token),
+
   getFechasPendientes: (token: string) =>
     apiClient.get<FechaPendiente[]>("/api/v1/cierres/pendientes", token),
 

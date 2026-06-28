@@ -28,7 +28,6 @@ import {
   BadgeCheck,
   ShieldAlert,
   ShieldOff,
-  Eye,
   Hotel,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +39,7 @@ import {
 } from "@/hooks/useEstablecimientos";
 import { useAuth } from "@/hooks/useAuth";
 import { movimientosApi } from "@/lib/api/movimientos";
+import { establecimientosApi } from "@/lib/api/establecimientos";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -168,29 +168,38 @@ export function EstablecimientosList() {
     setCategoriaId("todos");
   }
 
-  async function handleDelete() {
-    if (!deleteId || !accessToken) return;
+  async function handleDeleteClick(id: string) {
+    if (!accessToken) return;
     setVerificando(true);
     try {
-      // Verificar si el establecimiento tiene partes diarios registrados
-      const result = await movimientosApi.listPartes(accessToken, {
-        establecimientoId: deleteId,
-        pageSize: 1,
-        incluirAnulados: true,
-      });
-      if (result.total > 0) {
-        toast.error(
-          "No se puede eliminar: el establecimiento tiene partes diarios registrados.",
-          { duration: 5000 }
-        );
-        setDeleteId(null);
+      const [habitaciones, personal, partes] = await Promise.all([
+        establecimientosApi.listHabitaciones(accessToken, id),
+        establecimientosApi.listPersonal(accessToken, id),
+        movimientosApi.listPartes(accessToken, { establecimientoId: id, pageSize: 1, incluirAnulados: true }),
+      ]);
+      const deps: string[] = [];
+      if (habitaciones.length > 0) deps.push(`${habitaciones.length} habitación(es)`);
+      if (personal.length > 0) deps.push(`${personal.length} integrante(s) de personal`);
+      if (partes.total > 0) deps.push("partes diarios registrados");
+      if (deps.length > 0) {
+        toast.error(`No se puede eliminar: tiene ${deps.join(", ")}.`, { duration: 5000 });
         return;
       }
+      setDeleteId(id);
+    } catch {
+      toast.error("Error al verificar dependencias");
+    } finally {
+      setVerificando(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return;
+    try {
       await deleteMutation.mutateAsync(deleteId);
     } catch {
       toast.error("Error al eliminar");
     } finally {
-      setVerificando(false);
       setDeleteId(null);
     }
   }
@@ -315,20 +324,14 @@ export function EstablecimientosList() {
           <Link
             href={`/establecimientos/${e.id}`}
             className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            title="Ver / Editar"
-          >
-            <Eye size={14} />
-          </Link>
-          <Link
-            href={`/establecimientos/${e.id}`}
-            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             title="Editar"
           >
             <Pencil size={14} />
           </Link>
           <button
-            onClick={() => setDeleteId(e.id)}
-            className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+            onClick={() => handleDeleteClick(e.id)}
+            disabled={verificando}
+            className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
             title="Eliminar"
           >
             <Trash2 size={14} />

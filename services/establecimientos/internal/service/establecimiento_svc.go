@@ -35,7 +35,7 @@ func (s *EstablecimientoService) List(ctx context.Context, p domain.ListParams) 
 	if p.Page <= 0 {
 		p.Page = 1
 	}
-	if p.PageSize <= 0 || p.PageSize > 100 {
+	if p.PageSize <= 0 || p.PageSize > 500 {
 		p.PageSize = 20
 	}
 	data, total, err := s.repo.List(ctx, p)
@@ -74,6 +74,19 @@ func (s *EstablecimientoService) Create(ctx context.Context, userID, clientIP st
 	err := repository.WithAuditTx(ctx, s.pool, userID, clientIP, func(tx pgx.Tx) error {
 		var err error
 		result, err = s.repo.Create(ctx, tx, req)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *EstablecimientoService) Update(ctx context.Context, id, userID, clientIP string, req domain.UpdateEstablecimientoRequest) (*domain.EstablecimientoResponse, error) {
+	var result *domain.EstablecimientoResponse
+	err := repository.WithAuditTx(ctx, s.pool, userID, clientIP, func(tx pgx.Tx) error {
+		var err error
+		result, err = s.repo.Update(ctx, tx, id, req)
 		return err
 	})
 	if err != nil {

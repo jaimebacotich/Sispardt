@@ -14,10 +14,9 @@ import { cn } from "@/lib/utils";
 import {
   useCierrePorFecha,
   useCreateCierre,
-  usePartes,
+  usePreviewCierre,
 } from "@/hooks/useMovimientos";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import type { ParteDiario } from "@/types/api";
 
 /* ────────────────────────────────────────────────────────────
  * Helpers de fecha
@@ -240,24 +239,13 @@ export function CierrePanel({ fecha, modo, onCierreDone }: CierrePanelProps) {
   const [dialog, setDialog] = useState<DialogState>(null);
 
   const { data: cierreExistente, isLoading: loadingCierre } = useCierrePorFecha(fecha);
-  // Check-ins del día: partes con fechaReporte = fecha
-  const { data: checkinsRaw } = usePartes({ fechaReporte: fecha, pageSize: 500 });
-  // Check-outs del día: partes cuya salida fue en fecha, independientemente del ingreso
-  const { data: checkoutsRaw } = usePartes({ salidaFecha: fecha, pageSize: 500 });
+  const { data: preview } = usePreviewCierre(fecha);
   const cierreMutation = useCreateCierre();
 
-  const partesDia: ParteDiario[] = Array.isArray(checkinsRaw)
-    ? checkinsRaw
-    : (checkinsRaw as { data?: ParteDiario[] } | undefined)?.data ?? [];
-
-  const checkoutsDia: ParteDiario[] = Array.isArray(checkoutsRaw)
-    ? checkoutsRaw
-    : (checkoutsRaw as { data?: ParteDiario[] } | undefined)?.data ?? [];
-
-  const totalCheckins  = partesDia.length;
-  const totalCheckouts = checkoutsDia.length;
-  const huespedes      = partesDia.filter((p) => p.salidaAt === null && p.estadoOperativo === "ACTIVO").length;
   const yaCerrado      = !!cierreExistente;
+  const totalCheckins  = yaCerrado ? (cierreExistente?.totalCheckins ?? 0) : (preview?.totalCheckins ?? 0);
+  const totalCheckouts = yaCerrado ? (cierreExistente?.totalCheckouts ?? 0) : (preview?.totalCheckouts ?? 0);
+  const huespedes      = preview?.huespedes ?? 0;
   const esFueraPlazo   = modo === "fuera-de-plazo";
   const fechaLabel     = formatFechaLarga(fecha);
 
@@ -323,13 +311,13 @@ export function CierrePanel({ fecha, modo, onCierreDone }: CierrePanelProps) {
         <KpiCard
           icon={<LogIn size={18} className="text-primary" />}
           label="Check-in"
-          value={yaCerrado ? (cierreExistente?.totalCheckins ?? totalCheckins) : totalCheckins}
+          value={totalCheckins}
           colorClass="bg-primary/10"
         />
         <KpiCard
           icon={<LogOut size={18} className="text-chart-3" />}
           label="Check-out"
-          value={yaCerrado ? (cierreExistente?.totalCheckouts ?? totalCheckouts) : totalCheckouts}
+          value={totalCheckouts}
           colorClass="bg-chart-3/10"
         />
         <KpiCard
