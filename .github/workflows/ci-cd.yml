@@ -164,6 +164,8 @@ jobs:
             context: services/kafka-consumer
           - service: auditoria-sesiones
             context: services/auditoria-sesiones
+          - service: sistema
+            context: services/sistema
           - service: frontend
             context: frontend
 
@@ -370,6 +372,7 @@ jobs:
           MOV_STATS_DSN="postgresql://app_resp_estadistica:${{ secrets.APP_PASS_ESTAD }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           KC_DSN="postgresql://app_admin_general:${{ secrets.APP_PASS_ADMIN }}@db-movimientos:5432/sispardt_movimientos?sslmode=disable"
           AUD_SES_DSN="postgresql://app_sistema:${{ secrets.APP_PASS_AUD_SES }}@db-auditoria-sesiones:5432/sispardt_sistema?sslmode=disable"
+          SIS_DSN="postgresql://app_sistema:${{ secrets.APP_PASS_AUD_SES }}@db-sistema:5432/sispardt_sistema?sslmode=disable"
 
           kubectl create secret generic sispardt-secrets \
             --namespace=sispardt \
@@ -378,9 +381,11 @@ jobs:
             --from-literal=MOV_DB_DSN_STATS="${MOV_STATS_DSN}" \
             --from-literal=KC_CONSUMER_DB_DSN="${KC_DSN}" \
             --from-literal=AUD_SES_DB_DSN="${AUD_SES_DSN}" \
+            --from-literal=SIS_DB_DSN="${SIS_DSN}" \
             --from-literal=KC_SECRET_EST=${{ secrets.KC_SECRET_EST_SVC }} \
             --from-literal=KC_SECRET_MOV=${{ secrets.KC_SECRET_MOV_SVC }} \
             --from-literal=KC_SECRET_AUD=${{ secrets.KC_SECRET_AUD_SVC }} \
+            --from-literal=KC_SECRET_SIS=${{ secrets.KC_SECRET_SISTEMA_SVC }} \
             --from-literal=NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} \
             --from-literal=AUTH_KEYCLOAK_SECRET="" \
             --from-literal=DEFAULT_USER_PASSWORD=${{ secrets.DEFAULT_USER_PASSWORD }} \
@@ -392,7 +397,7 @@ jobs:
           IMAGE_OWNER: ${{ github.repository_owner }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          for dir in k8s/establecimientos k8s/movimientos k8s/auditoria-sesiones k8s/frontend; do
+          for dir in k8s/establecimientos k8s/movimientos k8s/auditoria-sesiones k8s/sistema k8s/frontend; do
             envsubst '${IMAGE_OWNER} ${IMAGE_TAG}' < ${dir}/deployment.yaml | kubectl apply -f -
           done
 
@@ -403,6 +408,7 @@ jobs:
           kubectl apply -f k8s/movimientos/service.yaml
           kubectl apply -f k8s/movimientos/hpa.yaml
           kubectl apply -f k8s/auditoria-sesiones/service.yaml
+          kubectl apply -f k8s/sistema/service.yaml
           kubectl apply -f k8s/frontend/service.yaml
           kubectl apply -f k8s/ingress.yaml
 
@@ -413,6 +419,7 @@ jobs:
           kubectl rollout status deployment/svc-establecimientos     -n sispardt --timeout=5m
           kubectl rollout status deployment/svc-movimientos          -n sispardt --timeout=5m
           kubectl rollout status deployment/svc-auditoria-sesiones   -n sispardt --timeout=5m
+          kubectl rollout status deployment/svc-sistema              -n sispardt --timeout=5m
           kubectl rollout status deployment/svc-frontend             -n sispardt --timeout=5m
 
       - name: Diagnóstico de pods fallidos
@@ -420,7 +427,7 @@ jobs:
         run: |
           echo "=== Pods en namespace sispardt ==="
           kubectl get pods -n sispardt -o wide
-          for dep in svc-establecimientos svc-movimientos svc-auditoria-sesiones svc-frontend; do
+          for dep in svc-establecimientos svc-movimientos svc-auditoria-sesiones svc-sistema svc-frontend; do
             echo ""
             echo "=== describe deployment/$dep ==="
             kubectl describe deployment/$dep -n sispardt 2>/dev/null || true

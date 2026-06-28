@@ -178,6 +178,72 @@ func (c *AdminClient) FetchEvents(ctx context.Context, dateFrom int64, eventType
 	return nil, fmt.Errorf("GET events KC: acceso denegado tras renovar token (403)")
 }
 
+// ─── Admin Events ─────────────────────────────────────────────────────────
+
+// KCAdminEvent representa un admin event del Admin REST API de Keycloak.
+type KCAdminEvent struct {
+	Time            int64  `json:"time"`
+	OperationType   string `json:"operationType"`
+	ResourceType    string `json:"resourceType"`
+	ResourcePath    string `json:"resourcePath"`
+	AuthDetails     struct {
+		RealmID  string `json:"realmId"`
+		ClientID string `json:"clientId"`
+		UserID   string `json:"userId"`
+		IPAddress string `json:"ipAddress"`
+	} `json:"authDetails"`
+	Representation string `json:"representation,omitempty"`
+}
+
+// FetchAdminEvents obtiene admin events desde Keycloak Admin API.
+func (c *AdminClient) FetchAdminEvents(ctx context.Context, dateFrom int64, operationTypes, resourceTypes []string, max int) ([]KCAdminEvent, error) {
+	for attempt := 0; attempt < 2; attempt++ {
+		token, err := c.getToken(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		q := url.Values{}
+		for _, op := range operationTypes {
+			q.Add("operationTypes", op)
+		}
+		for _, rt := range resourceTypes {
+			q.Add("resourceTypes", rt)
+		}
+		q.Set("dateFrom", fmt.Sprintf("%d", dateFrom))
+		q.Set("max", fmt.Sprintf("%d", max))
+
+		apiURL := fmt.Sprintf("%s/admin/realms/%s/admin-events?%s", c.baseURL, c.realm, q.Encode())
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("GET admin-events KC: %w", err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode == http.StatusForbidden {
+			c.invalidateToken()
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("GET admin-events KC: HTTP %d: %s", resp.StatusCode, string(body))
+		}
+
+		var events []KCAdminEvent
+		if err := json.Unmarshal(body, &events); err != nil {
+			return nil, fmt.Errorf("decodificar admin-events KC: %w", err)
+		}
+		return events, nil
+	}
+	return nil, fmt.Errorf("GET admin-events KC: acceso denegado tras renovar token (403)")
+}
+
 // ─── Sesiones activas ──────────────────────────────────────────────────────
 
 // KCUserSession representa una sesión activa del Admin REST API.

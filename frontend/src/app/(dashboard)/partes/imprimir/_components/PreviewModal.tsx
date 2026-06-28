@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { X, Download, Printer } from "lucide-react";
+import { X, Download, Printer, FileSpreadsheet } from "lucide-react";
 
 interface Props {
   pdfUrl: string;
@@ -40,6 +40,15 @@ export function PreviewModal({ pdfUrl, fecha, fechaRaw, nombreEstablecimiento, o
               <Download className="h-4 w-4" />
               Descargar PDF
             </a>
+
+            {/* Exportar Excel */}
+            <button
+              onClick={() => {}}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Exportar Excel
+            </button>
 
             {/* Imprimir */}
             <button

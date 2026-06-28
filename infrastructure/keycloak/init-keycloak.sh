@@ -381,7 +381,34 @@ else
     log "  WARN: no se pudo obtener service-account-user de sispardt-movimientos-svc"
 fi
 
-# ---- 10c. Asignar roles al service account de sispardt-sistema-svc ----
+# ---- 10c. Asignar roles al service account de sispardt-auditoria-sesiones-svc ----
+log "Asignando roles a sispardt-auditoria-sesiones-svc..."
+
+AUD_SVC_ID=$(
+    $KCADM get clients -r "${REALM}" -q "clientId=sispardt-auditoria-sesiones-svc" --fields id 2>/dev/null \
+    | grep '"id"' | cut -d'"' -f4 | head -1
+)
+AUD_SVC_USER_ID=$(
+    $KCADM get "clients/${AUD_SVC_ID}/service-account-user" \
+        -r "${REALM}" --fields id 2>/dev/null \
+    | grep '"id"' | cut -d'"' -f4 | head -1
+)
+
+if [ -n "$AUD_SVC_USER_ID" ] && [ -n "$REALM_MGMT_ID" ]; then
+    $KCADM add-roles -r "${REALM}" --uid "${AUD_SVC_USER_ID}" \
+        --cclientid realm-management \
+        --rolename view-events \
+        --rolename view-clients \
+        --rolename query-users \
+        --rolename view-users \
+        --rolename manage-users 2>/dev/null \
+        && ok "  view-events, view-clients, query-users, view-users, manage-users asignados a sispardt-auditoria-sesiones-svc" \
+        || log "  WARN: no se pudo asignar roles KC admin (pueden ya estar asignados)"
+else
+    log "  WARN: no se pudo obtener service-account-user de sispardt-auditoria-sesiones-svc"
+fi
+
+# ---- 10e. Asignar roles al service account de sispardt-sistema-svc ----
 # Roles requeridos:
 #   view-events  → leer eventos de login/logout del realm
 #   view-clients → consultar sesiones activas por cliente UUID
@@ -416,7 +443,7 @@ else
     log "  WARN: no se pudo obtener service-account-user de sispardt-sistema-svc"
 fi
 
-# ---- 10d. Habilitar registro de eventos en el realm (R-02) ----
+# ---- 10f. Habilitar registro de eventos en el realm (R-02) ----
 # Sin esto el poller recibirá [] y no insertará nada sin reportar error.
 # Verificar: curl -H "Authorization: Bearer $TOKEN" \
 #   http://localhost:8080/admin/realms/sispardt | jq '.eventsEnabled,.enabledEventTypes'
@@ -425,7 +452,9 @@ $KCADM update "realms/${REALM}" \
     -s eventsEnabled=true \
     -s 'enabledEventTypes=["LOGIN","LOGOUT","LOGIN_ERROR"]' \
     -s eventsExpiration=604800 \
-    && ok "  Eventos habilitados: LOGIN, LOGOUT, LOGIN_ERROR (retención 7 días en KC)" \
+    -s adminEventsEnabled=true \
+    -s adminEventsDetailsEnabled=true \
+    && ok "  Eventos habilitados: LOGIN, LOGOUT, LOGIN_ERROR + admin events (retención 7 días en KC)" \
     || log "  WARN: no se pudo habilitar eventos en el realm"
 
 # ---- 11. Crear/actualizar usuarios ----
@@ -494,7 +523,8 @@ log "    ${KC_TEC_USERNAME}   -> tecnico_registro     (${INST_UUID})"
 log "  Contraseña: ver variable SISPARDT_USER_PASSWORD en .env"
 log "  Login: ${KC_URL}/realms/${REALM}/account"
 log "  Clientes SA:"
-log "    sispardt-establecimientos-svc → manage-users, view-users, view-realm"
-log "    sispardt-movimientos-svc      → query-users, view-users"
-log "    sispardt-sistema-svc          → view-events, view-clients, query-users, view-users, manage-users, view-realm"
+log "    sispardt-establecimientos-svc    → manage-users, view-users, view-realm"
+log "    sispardt-movimientos-svc         → query-users, view-users"
+log "    sispardt-auditoria-sesiones-svc  → view-events, view-clients, query-users, view-users, manage-users"
+log "    sispardt-sistema-svc             → view-events, view-clients, query-users, view-users, manage-users, view-realm"
 log "  Eventos KC: LOGIN, LOGOUT, LOGIN_ERROR habilitados"

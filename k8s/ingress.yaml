@@ -88,6 +88,25 @@ spec:
           port: 8084
 
 ---
+# ─── Sistema (gestión de usuarios) ───────────────────────────────────────────
+# Prioridad 15: por encima de establecimientos (prio 10)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sispardt-sistema
+  namespace: sispardt
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: PathPrefix(`/api/v1/usuarios-sistema`) || PathPrefix(`/api/v1/sistema`)
+      priority: 15
+      services:
+        - name: svc-sistema
+          port: 8085
+
+---
 # ─── Frontend (catch-all) ─────────────────────────────────────────────────────
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute

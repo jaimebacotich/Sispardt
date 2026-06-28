@@ -373,6 +373,27 @@ func (h *CierreDiarioHandler) Create(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, result)
 }
 
+func (h *CierreDiarioHandler) FechaCierreActual(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromContext(r.Context())
+	estID := claims.EstablecimientoID
+	if estID == "" {
+		estID = r.URL.Query().Get("establecimiento_id")
+	}
+	if estID == "" {
+		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
+		return
+	}
+	fechaAyer, fechaInicio, err := h.svc.GetFechaCierreActual(r.Context(), estID)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "error al obtener fecha de cierre")
+		return
+	}
+	jsonOK(w, map[string]any{
+		"fechaCierre":          fechaAyer,
+		"fechaInicioOperaciones": fechaInicio,
+	})
+}
+
 func (h *CierreDiarioHandler) List(w http.ResponseWriter, r *http.Request) {
 	claims := auth.FromContext(r.Context())
 	estID := claims.EstablecimientoID

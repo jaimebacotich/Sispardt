@@ -702,12 +702,38 @@ func (s *ParteDiarioService) GetFechasPendientes(ctx context.Context, establecim
 	return s.repo.GetFechasPendientes(ctx, establecimientoID)
 }
 
+func (s *ParteDiarioService) GetFechaCierreActual(ctx context.Context, establecimientoID string) (string, *string, error) {
+	return s.repo.GetFechaCierreActual(ctx, establecimientoID)
+}
+
 func (s *ParteDiarioService) CreateCierre(ctx context.Context, userID, cerradoPor, username, firstName, lastName, clientIP, establecimientoID string, req domain.CreateCierreDiarioRequest) (*domain.CierreDiarioResponse, error) {
 	if req.FechaReporte == "" {
 		return nil, fmt.Errorf("fechaReporte es requerida")
 	}
+
+	fechaReporte, err := time.Parse("2006-01-02", req.FechaReporte)
+	if err != nil {
+		return nil, fmt.Errorf("formato de fecha inválido, se espera YYYY-MM-DD")
+	}
+
+	hoyBolivia := time.Now().In(boliviaLoc()).Truncate(24 * time.Hour)
+	if !fechaReporte.Before(hoyBolivia) {
+		return nil, fmt.Errorf("no se puede cerrar el parte de una fecha que aún no ha concluido")
+	}
+
+	fechaInicio, err := s.repo.GetFechaInicioOperaciones(ctx, establecimientoID)
+	if err != nil {
+		return nil, fmt.Errorf("error al verificar fecha de inicio de operaciones: %w", err)
+	}
+	if fechaInicio != nil {
+		inicio, err := time.Parse("2006-01-02", *fechaInicio)
+		if err == nil && fechaReporte.Before(inicio) {
+			return nil, fmt.Errorf("no se puede cerrar una fecha anterior al inicio de operaciones (%s)", *fechaInicio)
+		}
+	}
+
 	var c *domain.CierreDiario
-	err := repository.WithAuditTx(ctx, s.pool, userID, clientIP, establecimientoID, func(tx pgx.Tx) error {
+	err = repository.WithAuditTx(ctx, s.pool, userID, clientIP, establecimientoID, func(tx pgx.Tx) error {
 		var err error
 		c, err = s.repo.CreateCierre(ctx, tx, establecimientoID, cerradoPor, username, firstName, lastName, req)
 		return err

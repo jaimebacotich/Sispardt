@@ -3,6 +3,7 @@ package poller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,8 +24,12 @@ var sensitiveKeys = map[string]bool{
 	"session_note":  true,
 }
 
-// Tipos de eventos que se capturan (v1).
+// Tipos de eventos de usuario que se capturan.
 var eventTypes = []string{"LOGIN", "LOGOUT", "LOGIN_ERROR"}
+
+// Tipos de admin events que se capturan.
+var adminOperationTypes = []string{"CREATE", "UPDATE", "DELETE"}
+var adminResourceTypes = []string{"USER", "REALM_ROLE_MAPPING"}
 
 // State contiene el estado observable del poller para el /health endpoint.
 type State struct {
@@ -136,26 +141,18 @@ func (p *Poller) runOnce(ctx context.Context) {
 		return
 	}
 
-	if len(events) == 0 {
-		p.State.update(now, nil)
-		metrics.PollerLastPollTimestamp.SetToCurrentTime()
-		return
-	}
-
-	// Convertir y sanitizar
+	// Convertir user events
 	sesiones := make([]domain.SesionAuditoria, 0, len(events))
 	var maxTS time.Time
 
 	for _, ev := range events {
 		ts := time.UnixMilli(ev.Time).UTC()
 
-		// Extraer username del mapa details ANTES de sanitizar (está disponible en LOGIN/LOGIN_ERROR)
 		username := ""
 		if u, ok := ev.Details["username"].(string); ok {
 			username = u
 		}
 
-		// Sanitizar detalle JSONB (P-04): eliminar campos sensibles
 		detalle := sanitizeDetails(ev.Details)
 
 		s := domain.SesionAuditoria{
@@ -175,6 +172,40 @@ func (p *Poller) runOnce(ctx context.Context) {
 		if ts.After(maxTS) {
 			maxTS = ts
 		}
+	}
+
+	// Obtener admin events (CREATE/UPDATE/DELETE de USER y REALM_ROLE_MAPPING)
+	adminEvents, err := p.kcClient.FetchAdminEvents(ctx, dateFromMs, adminOperationTypes, adminResourceTypes, 200)
+	if err != nil {
+		log.Warn().Err(err).Msg("poller: error obteniendo admin-events de Keycloak")
+	} else {
+		for _, ae := range adminEvents {
+			ts := time.UnixMilli(ae.Time).UTC()
+			tipoEvento := ae.OperationType + "_" + ae.ResourceType
+
+			eventID := fmt.Sprintf("admin-%s-%d-%s", ae.AuthDetails.UserID, ae.Time, ae.ResourcePath)
+
+			s := domain.SesionAuditoria{
+				KeycloakEventID: eventID,
+				TipoEvento:      tipoEvento,
+				UsuarioID:       ae.AuthDetails.UserID,
+				Realm:           p.realm,
+				ClientID:        ae.AuthDetails.ClientID,
+				IPAddress:       ae.AuthDetails.IPAddress,
+				EventoTimestamp: ts,
+			}
+			sesiones = append(sesiones, s)
+
+			if ts.After(maxTS) {
+				maxTS = ts
+			}
+		}
+	}
+
+	if len(sesiones) == 0 {
+		p.State.update(now, nil)
+		metrics.PollerLastPollTimestamp.SetToCurrentTime()
+		return
 	}
 
 	// Resolver usernames faltantes para LOGOUT (KC no los incluye en details).

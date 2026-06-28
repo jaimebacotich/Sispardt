@@ -114,6 +114,31 @@ subsets:
         port: 5435
 
 ---
+# ─── db-sistema ──────────────────────────────────────────────────────────────
+# Misma BD que db-auditoria-sesiones (host port 5435), alias para svc-sistema
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-sistema
+  namespace: sispardt
+spec:
+  ports:
+    - name: pg
+      port: 5432
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: db-sistema
+  namespace: sispardt
+subsets:
+  - addresses:
+      - ip: ${NODE_IP}
+    ports:
+      - name: pg
+        port: 5435
+
+---
 # ─── kafka ────────────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: Service

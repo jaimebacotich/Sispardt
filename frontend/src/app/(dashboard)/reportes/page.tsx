@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileBarChart2, Download, Printer, CalendarIcon } from "lucide-react";
+import { FileBarChart2, Download, Printer, CalendarIcon, FileSpreadsheet } from "lucide-react";
 import { useLocalidades, useEstablecimientos, useEstablecimiento } from "@/hooks/useEstablecimientos";
 import { useReportePDF, useReporteNacionalPDF, useReporteInternacionalPDF, useReporteMunicipioNacionalPDF, useReporteMunicipioInternacionalPDF } from "@/hooks/useMovimientos";
 import type { Localidad } from "@/types/api";
@@ -383,6 +383,12 @@ export default function ReportesPage() {
               >
                 <Download className="h-4 w-4" /> Descargar PDF
               </a>
+              <button
+                onClick={() => {}}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              >
+                <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
+              </button>
               <button
                 onClick={() => {
                   const iframe = document.querySelector<HTMLIFrameElement>("#pdf-reporte-iframe");

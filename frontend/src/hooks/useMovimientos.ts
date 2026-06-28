@@ -25,6 +25,7 @@ export const MOV_KEYS = {
   cierres:             ["cierres"] as const,
   cierrePorFecha:      (fecha: string) => ["cierres", fecha] as const,
   fechasPendientes:    ["cierres-pendientes"] as const,
+  fechaCierreActual:   ["cierres-fecha-actual"] as const,
 };
 
 // ── Catálogos ──────────────────────────────────────────────────────────────
@@ -176,6 +177,16 @@ export function useCierrePorFecha(fecha: string) {
         ? Promise.resolve(mockStore.cierre.getPorFecha(fecha))
         : movimientosApi.getCierrePorFecha(accessToken!, fecha),
     enabled: !!fecha,
+  });
+}
+
+// ── Fecha de cierre actual (desde servidor BD) ────────────────────────────
+export function useFechaCierreActual() {
+  const { accessToken } = useAuth();
+  return useQuery({
+    queryKey: MOV_KEYS.fechaCierreActual,
+    queryFn: () => movimientosApi.getFechaCierreActual(accessToken!),
+    enabled: !USE_MOCK && !!accessToken,
   });
 }
 

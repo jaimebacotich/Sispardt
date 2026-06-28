@@ -836,6 +836,36 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 	return results, nil
 }
 
+// GetFechaCierreActual devuelve la fecha de ayer (hora Bolivia) y la
+// fecha de inicio de operaciones del establecimiento, ambas desde el servidor BD.
+func (r *ParteDiarioRepo) GetFechaCierreActual(ctx context.Context, establecimientoID string) (fechaAyer string, fechaInicio *string, err error) {
+	const sql = `
+		SELECT (CURRENT_DATE AT TIME ZONE 'America/La_Paz' - INTERVAL '1 day')::date::text,
+		       (SELECT fecha_inicio_operaciones::text
+		        FROM public.establecimientos_replica_cache
+		        WHERE establecimiento_id = $1)`
+	var inicio *string
+	if err := r.pool.QueryRow(ctx, sql, establecimientoID).Scan(&fechaAyer, &inicio); err != nil {
+		return "", nil, fmt.Errorf("fecha cierre actual: %w", err)
+	}
+	return fechaAyer, inicio, nil
+}
+
+// GetFechaInicioOperaciones devuelve la fecha de inicio de operaciones desde la caché de réplica.
+func (r *ParteDiarioRepo) GetFechaInicioOperaciones(ctx context.Context, establecimientoID string) (*string, error) {
+	const sql = `SELECT fecha_inicio_operaciones::text
+	             FROM public.establecimientos_replica_cache
+	             WHERE establecimiento_id = $1`
+	var fecha *string
+	if err := r.pool.QueryRow(ctx, sql, establecimientoID).Scan(&fecha); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("fecha inicio operaciones: %w", err)
+	}
+	return fecha, nil
+}
+
 // ─── Estadísticas ─────────────────────────────────────────────────────────────
 
 func (r *ParteDiarioRepo) OcupacionDiaria(ctx context.Context, estIDs []string, desde, hasta time.Time) ([]domain.OcupacionDiaria, error) {
