@@ -411,6 +411,7 @@ jobs:
           kubectl apply -f k8s/sistema/service.yaml
           kubectl apply -f k8s/frontend/service.yaml
           kubectl apply -f k8s/ingress.yaml
+          kubectl apply -f k8s/traefik-metrics-service.yaml
 
       # ── Verificar rollouts ────────────────────────────────────────────────────
       - name: Verificar rollouts

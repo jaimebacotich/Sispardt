@@ -171,8 +171,8 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "sum(rate(traefik_router_requests_total[1m])) by (router)",
-          "legendFormat": "{{router}}"
+          "expr": "sum(rate(traefik_service_requests_total[1m])) by (service)",
+          "legendFormat": "{{service}}"
         }
       ]
     },
@@ -226,7 +226,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "sum(rate(traefik_router_requests_total{code=~\"4..|5..\"}[5m])) by (code)",
+          "expr": "sum(rate(traefik_service_requests_total{code=~\"4..|5..\"}[5m])) by (code)",
           "legendFormat": "HTTP {{code}}"
         }
       ],
