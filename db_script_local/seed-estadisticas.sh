@@ -2,7 +2,7 @@
 # ============================================================
 # SISPARDT — Seed de datos de prueba para pantalla Estadísticas
 #
-# Crea 3 establecimientos en Tarija con habitaciones y 90 días
+# Crea 3 establecimientos en Tarija con habitaciones y ~178 días
 # de partes diarios con distribución realista de nacionalidades,
 # motivos de viaje y tipos de habitación.
 #
@@ -856,7 +856,7 @@ ok "Establecimientos insertados (EST1–EST21, 21 establecimientos, 7 municipios
 # habitaciones_replica_cache: refleja las 33 habitaciones
 # con capacidad_calculada = suma(tipo_cama.capacidad × cantidad)
 #
-# partes_diarios: 90 días fijos (2026-01-01 a 2026-05-15) × 3 establecimientos
+# partes_diarios: 178 días fijos (2026-01-01 a 2026-06-27) × 21 establecimientos
 #   Variación diaria usando ondas sinusoidales → gráficas de línea con curvas reales
 #   EST1: 8–20 huéspedes/día (pico carnaval ~Feb 20) → ~1 200 registros
 #   EST2: 3–11 huéspedes/día (alto enero, cae en marzo) → ~  650 registros
@@ -1205,7 +1205,7 @@ FROM (
     g.n,
     -- Onda: mínimo ~8 en enero, pico 20 en carnaval (~20-feb = día 50), baja a 10 en marzo
     (8 + round(12 * (0.5 + 0.5 * sin((d::date - '2026-01-01'::date)::float * pi() / 60 - pi() / 3))))::int AS load
-  FROM generate_series('2026-01-01'::date, '2026-05-15'::date, '1 day'::interval) d
+  FROM generate_series('2026-01-01'::date, '2026-06-27'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 20) g(n)
 ) t
 WHERE t.n <= t.load;
@@ -1266,7 +1266,7 @@ FROM (
     g.n,
     -- Onda: empieza alto (11 en enero), decrece hacia 3 en marzo, leve rebote en carnaval
     (3 + round(8 * (0.5 + 0.5 * cos((d::date - '2026-01-01'::date)::float * pi() / 89) + 0.0)))::int AS load
-  FROM generate_series('2026-01-01'::date, '2026-05-15'::date, '1 day'::interval) d
+  FROM generate_series('2026-01-01'::date, '2026-06-27'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 11) g(n)
 ) t
 WHERE t.n <= t.load;
@@ -1323,7 +1323,7 @@ FROM (
     g.n,
     -- Onda: oscilación ~mensual (período 30 días), entre 2 y 8 huéspedes
     (2 + round(6 * abs(sin((d::date - '2026-01-01'::date)::float * pi() / 30))))::int AS load
-  FROM generate_series('2026-01-01'::date, '2026-05-15'::date, '1 day'::interval) d
+  FROM generate_series('2026-01-01'::date, '2026-06-27'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 8) g(n)
 ) t
 WHERE t.n <= t.load;
@@ -1369,7 +1369,7 @@ FROM (
     (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
     -- Tendencia creciente lineal: de 3 en enero a 8 en marzo
     (3 + round(5 * (d::date - '2026-01-01'::date)::float / 89))::int AS load
-  FROM generate_series('2026-01-01'::date, '2026-05-15'::date, '1 day'::interval) d
+  FROM generate_series('2026-01-01'::date, '2026-06-27'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 8) g(n)
 ) t
 WHERE t.n <= t.load;
@@ -1413,7 +1413,7 @@ FROM (
     (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
     -- Bimodal: picos alrededor de día 20 (ene) y día 65 (mar)
     (2 + round(4 * abs(sin((d::date - '2026-01-01'::date)::float * pi() / 40))))::int AS load
-  FROM generate_series('2026-01-01'::date, '2026-05-15'::date, '1 day'::interval) d
+  FROM generate_series('2026-01-01'::date, '2026-06-27'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 6) g(n)
 ) t
 WHERE t.n <= t.load;
@@ -1461,7 +1461,7 @@ FROM (
     (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
     -- Alto en enero (verano/calor), baja gradualmente hacia marzo
     (5 + round(9 * (0.5 + 0.45 * cos((d::date - '2026-01-01'::date)::float * pi() / 89))))::int AS load
-  FROM generate_series('2026-01-01'::date, '2026-05-15'::date, '1 day'::interval) d
+  FROM generate_series('2026-01-01'::date, '2026-06-27'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 14) g(n)
 ) t
 WHERE t.n <= t.load;
@@ -1503,7 +1503,7 @@ FROM (
     (d::date - '2026-01-01'::date)::int AS day_idx, g.n,
     -- Pequeña oscilación mensual, capacidad limitada
     (2 + round(3 * abs(sin((d::date - '2026-01-01'::date)::float * pi() / 25))))::int AS load
-  FROM generate_series('2026-01-01'::date, '2026-05-15'::date, '1 day'::interval) d
+  FROM generate_series('2026-01-01'::date, '2026-06-27'::date, '1 day'::interval) d
   CROSS JOIN generate_series(1, 5) g(n)
 ) t
 WHERE t.n <= t.load;
@@ -1523,7 +1523,7 @@ SELECT gen_random_uuid(),'e8e80000-5eed-5eed-5eed-000000000008'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (6+round(8*(0.5+0.5*cos((d::date-'2026-01-01'::date)::float*pi()/60-pi()/3))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,14) g(n)) t WHERE t.n<=t.load;
 
 -- EST9: 4–9 huéspedes/día, Tarija Hostal (pico en carnaval)
@@ -1541,7 +1541,7 @@ SELECT gen_random_uuid(),'e9e90000-5eed-5eed-5eed-000000000009'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (4+round(5*(0.5+0.5*sin((d::date-'2026-01-01'::date)::float*pi()/60-pi()/3))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,9) g(n)) t WHERE t.n<=t.load;
 
 -- EST10: 5–12 huéspedes/día, Yacuiba Hotel (alto en enero, oscilación)
@@ -1559,7 +1559,7 @@ SELECT gen_random_uuid(),'eaaa0000-5eed-5eed-5eed-00000000000a'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (5+round(7*(0.5+0.5*cos((d::date-'2026-01-01'::date)::float*pi()/89))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,12) g(n)) t WHERE t.n<=t.load;
 
 -- EST11: 2–5 huéspedes/día, Yacuiba Tipo A (bajo y estable)
@@ -1577,7 +1577,7 @@ SELECT gen_random_uuid(),'ebbb0000-5eed-5eed-5eed-00000000000b'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (2+round(3*abs(sin((d::date-'2026-01-01'::date)::float*pi()/45))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,5) g(n)) t WHERE t.n<=t.load;
 
 -- EST12: 3–7 huéspedes/día, San Lorenzo Hostal (oscilación quincenal)
@@ -1595,7 +1595,7 @@ SELECT gen_random_uuid(),'eccc0000-5eed-5eed-5eed-00000000000c'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (3+round(4*abs(sin((d::date-'2026-01-01'::date)::float*pi()/15))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,7) g(n)) t WHERE t.n<=t.load;
 
 -- EST13: 2–4 huéspedes/día, San Lorenzo Tipo A (bajo, tendencia leve)
@@ -1613,7 +1613,7 @@ SELECT gen_random_uuid(),'eddd0000-5eed-5eed-5eed-00000000000d'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (2+round(2*(d::date-'2026-01-01'::date)::float/89))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,4) g(n)) t WHERE t.n<=t.load;
 
 -- EST14: 4–11 huéspedes/día, Bermejo Hotel (tendencia creciente)
@@ -1631,7 +1631,7 @@ SELECT gen_random_uuid(),'eeee0000-5eed-5eed-5eed-00000000000e'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (4+round(7*(d::date-'2026-01-01'::date)::float/89))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,11) g(n)) t WHERE t.n<=t.load;
 
 -- EST15: 2–4 huéspedes/día, Bermejo Tipo A
@@ -1649,7 +1649,7 @@ SELECT gen_random_uuid(),'efff0000-5eed-5eed-5eed-00000000000f'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (2+round(2*abs(sin((d::date-'2026-01-01'::date)::float*pi()/30))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,4) g(n)) t WHERE t.n<=t.load;
 
 -- EST16: 3–7 huéspedes/día, Entre Ríos Hostal (bimodal complementario)
@@ -1667,7 +1667,7 @@ SELECT gen_random_uuid(),'f1f10000-5eed-5eed-5eed-000000000010'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (3+round(4*abs(sin((d::date-'2026-01-01'::date)::float*pi()/45+pi()/2))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,7) g(n)) t WHERE t.n<=t.load;
 
 -- EST17: 2–4 huéspedes/día, Entre Ríos Tipo A
@@ -1685,7 +1685,7 @@ SELECT gen_random_uuid(),'f2f20000-5eed-5eed-5eed-000000000011'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (2+round(2*abs(cos((d::date-'2026-01-01'::date)::float*pi()/40))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,4) g(n)) t WHERE t.n<=t.load;
 
 -- EST18: 4–9 huéspedes/día, Villa Montes Hostal (alto verano, complemento a EST6)
@@ -1703,7 +1703,7 @@ SELECT gen_random_uuid(),'f3f30000-5eed-5eed-5eed-000000000012'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (4+round(5*(0.5+0.45*cos((d::date-'2026-01-01'::date)::float*pi()/89))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,9) g(n)) t WHERE t.n<=t.load;
 
 -- EST19: 2–5 huéspedes/día, Villa Montes Tipo A
@@ -1721,7 +1721,7 @@ SELECT gen_random_uuid(),'f4f40000-5eed-5eed-5eed-000000000013'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (2+round(3*abs(sin((d::date-'2026-01-01'::date)::float*pi()/25+pi()/4))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,5) g(n)) t WHERE t.n<=t.load;
 
 -- EST20: 3–6 huéspedes/día, Uriondo Hostal (turismo de viñedos, pico en verano)
@@ -1739,7 +1739,7 @@ SELECT gen_random_uuid(),'f5f50000-5eed-5eed-5eed-000000000014'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (3+round(3*(0.5+0.5*cos((d::date-'2026-01-01'::date)::float*pi()/89))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,6) g(n)) t WHERE t.n<=t.load;
 
 -- EST21: 2–4 huéspedes/día, Uriondo Tipo A (cabaña, demanda suave)
@@ -1757,7 +1757,7 @@ SELECT gen_random_uuid(),'f6f60000-5eed-5eed-5eed-000000000015'::uuid,
   'ACTIVO'
 FROM (SELECT d::date AS fecha,(d::date-'2026-01-01'::date)::int AS day_idx,g.n,
   (2+round(2*abs(sin((d::date-'2026-01-01'::date)::float*pi()/30+pi()/6))))::int AS load
-  FROM generate_series('2026-01-01'::date,'2026-05-15'::date,'1 day'::interval) d
+  FROM generate_series('2026-01-01'::date,'2026-06-27'::date,'1 day'::interval) d
   CROSS JOIN generate_series(1,4) g(n)) t WHERE t.n<=t.load;
 
 -- Restaurar triggers

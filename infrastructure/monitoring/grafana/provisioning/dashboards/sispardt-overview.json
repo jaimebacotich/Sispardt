@@ -43,7 +43,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "100 - (node_filesystem_avail_bytes{mountpoint=\"/var/lib\"} / node_filesystem_size_bytes{mountpoint=\"/var/lib\"} * 100)",
+          "expr": "100 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100)",
           "legendFormat": "Disco usado %"
         }
       ],
@@ -90,7 +90,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "node_filesystem_avail_bytes{mountpoint=\"/var/lib\"}",
+          "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"}",
           "legendFormat": "Libre"
         }
       ],
@@ -121,7 +121,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-sispardt" },
-          "expr": "node_filesystem_size_bytes{mountpoint=\"/var/lib\"}",
+          "expr": "node_filesystem_size_bytes{mountpoint=\"/\"}",
           "legendFormat": "Total"
         }
       ],
