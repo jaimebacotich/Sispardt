@@ -15,3 +15,4 @@ export { NumberSpinner } from "./number-spinner";
 export { DatePicker } from "./date-picker";
 export { ComboboxSearch } from "./combobox-search";
 export type { ComboboxOption } from "./combobox-search";
+export { PdfPreviewModal } from "./pdf-preview-modal";

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileBarChart2, Download, Printer, CalendarIcon, FileSpreadsheet } from "lucide-react";
+import { FileBarChart2, CalendarIcon } from "lucide-react";
+import { PdfPreviewModal } from "@/components/shared";
 import { useLocalidades, useEstablecimientos, useEstablecimiento } from "@/hooks/useEstablecimientos";
 import { useReportePDF, useReporteNacionalPDF, useReporteInternacionalPDF, useReporteMunicipioNacionalPDF, useReporteMunicipioInternacionalPDF } from "@/hooks/useMovimientos";
 import type { Localidad } from "@/types/api";
@@ -367,53 +368,15 @@ export default function ReportesPage() {
         </button>
       </div>
 
-      {/* Preview del PDF */}
+      {/* Preview del PDF — pantalla completa */}
       {pdfUrl && (
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
-            <div>
-              <p className="text-sm font-semibold text-foreground">{establecimientoNombre}</p>
-              <p className="text-xs text-muted-foreground">{pdfFechaLabel}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <a
-                href={pdfUrl}
-                download={nombreArchivo}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-              >
-                <Download className="h-4 w-4" /> Descargar PDF
-              </a>
-              <button
-                onClick={() => {}}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-              >
-                <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
-              </button>
-              <button
-                onClick={() => {
-                  const iframe = document.querySelector<HTMLIFrameElement>("#pdf-reporte-iframe");
-                  iframe?.contentWindow?.print();
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
-              >
-                <Printer className="h-4 w-4" /> Imprimir
-              </button>
-              <button
-                onClick={handleCerrar}
-                className="text-xs text-muted-foreground hover:text-foreground px-2 transition-colors"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-          <iframe
-            id="pdf-reporte-iframe"
-            src={pdfUrl}
-            className="w-full border-0"
-            style={{ height: "70vh" }}
-            title="Vista previa del reporte"
-          />
-        </div>
+        <PdfPreviewModal
+          pdfUrl={pdfUrl}
+          titulo={pdfFechaLabel}
+          subtitulo={establecimientoNombre || undefined}
+          nombreArchivo={nombreArchivo}
+          onCerrar={handleCerrar}
+        />
       )}
     </div>
   );
