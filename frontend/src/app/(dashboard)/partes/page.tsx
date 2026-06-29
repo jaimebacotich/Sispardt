@@ -6,20 +6,25 @@ import { CheckinWizard } from "@/components/recepcionista/checkin-wizard";
 import { ActiveGuestsTable } from "@/components/recepcionista/active-guests-table";
 import { CheckoutGuestsTable } from "@/components/recepcionista/checkout-guests-table";
 import { CheckoutModal } from "@/components/recepcionista/checkout-modal";
+import { useFechaCierreActual } from "@/hooks/useMovimientos";
 import type { ParteDiario } from "@/types/api";
 
-// Fecha en español —  ej: "Domingo, 8 de marzo de 2026"
-function formatFechaEspanol(fecha: Date): string {
-  return fecha.toLocaleDateString("es-BO", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+const MESES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+function formatFechaISO(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const fecha = new Date(y, m - 1, d);
+  const dia = DIAS[fecha.getDay()];
+  return `${dia}, ${d} de ${MESES[m - 1]} de ${y}`;
 }
 
 export default function PartesPage() {
-  const hoy = new Date();
+  const { data: fechaServer } = useFechaCierreActual();
+  const fechaHoy = fechaServer?.fechaHoy ?? new Date().toISOString().slice(0, 10);
   const [showWizard, setShowWizard] = useState(false);
   const [parteParaCheckout, setParteParaCheckout] = useState<ParteDiario | null>(null);
 
@@ -29,7 +34,7 @@ export default function PartesPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground capitalize">
-            {formatFechaEspanol(hoy)}
+            {formatFechaISO(fechaHoy)}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Check-in · Check-out · Partes Diarios

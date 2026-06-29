@@ -20,6 +20,7 @@ import {
   useHabitacionesEstadoEnFecha,
   useCreateParte,
   useCatalogosMovimientos,
+  useFechaCierreActual,
 } from "@/hooks/useMovimientos";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { CatalogosMovimientos } from "@/types/api";
@@ -184,7 +185,8 @@ interface CheckinWizardProps {
 
 export function CheckinWizard({ onClose, fechaInicial }: CheckinWizardProps) {
   const [step, setStep] = useState(0);
-  const today = new Date().toISOString().slice(0, 10);
+  const { data: fechaServer } = useFechaCierreActual();
+  const today = fechaServer?.fechaHoy ?? new Date().toISOString().slice(0, 10);
   const fechaDefault = fechaInicial ?? today;
   const esFueraDePlazo = !!fechaInicial && fechaInicial < today;
 

@@ -702,7 +702,7 @@ func (s *ParteDiarioService) GetFechasPendientes(ctx context.Context, establecim
 	return s.repo.GetFechasPendientes(ctx, establecimientoID)
 }
 
-func (s *ParteDiarioService) GetFechaCierreActual(ctx context.Context, establecimientoID string) (string, *string, error) {
+func (s *ParteDiarioService) GetFechaCierreActual(ctx context.Context, establecimientoID string) (fechaHoy, fechaAyer string, fechaInicio *string, err error) {
 	return s.repo.GetFechaCierreActual(ctx, establecimientoID)
 }
 

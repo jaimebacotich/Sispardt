@@ -410,13 +410,14 @@ func (h *CierreDiarioHandler) FechaCierreActual(w http.ResponseWriter, r *http.R
 		jsonError(w, http.StatusBadRequest, "establecimiento_id requerido")
 		return
 	}
-	fechaAyer, fechaInicio, err := h.svc.GetFechaCierreActual(r.Context(), estID)
+	fechaHoy, fechaAyer, fechaInicio, err := h.svc.GetFechaCierreActual(r.Context(), estID)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, "error al obtener fecha de cierre")
 		return
 	}
 	jsonOK(w, map[string]any{
-		"fechaCierre":          fechaAyer,
+		"fechaHoy":               fechaHoy,
+		"fechaCierre":            fechaAyer,
 		"fechaInicioOperaciones": fechaInicio,
 	})
 }

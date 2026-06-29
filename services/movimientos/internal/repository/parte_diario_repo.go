@@ -291,7 +291,7 @@ func (r *ParteDiarioRepo) CreateParte(ctx context.Context, tx pgx.Tx, personaID,
 			recepcionista_username, recepcionista_nombre, recepcionista_apellido,
 			hab_nro_snapshot, hab_tipo_snapshot, hab_piso_snapshot,
 			condicion_entrega
-		) VALUES ($1,$2,$3,$4,($4::date)::timestamp AT TIME ZONE 'America/La_Paz',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		) VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		RETURNING id, establecimiento_id, habitacion_id, persona_id, fecha_reporte::text,
 		          ingreso_at, salida_at, keycloak_recepcionista_id,
 		          recepcionista_username, recepcionista_nombre, recepcionista_apellido,
@@ -863,17 +863,18 @@ func (r *ParteDiarioRepo) GetFechasPendientes(ctx context.Context, establecimien
 
 // GetFechaCierreActual devuelve la fecha de ayer (hora Bolivia) y la
 // fecha de inicio de operaciones del establecimiento, ambas desde el servidor BD.
-func (r *ParteDiarioRepo) GetFechaCierreActual(ctx context.Context, establecimientoID string) (fechaAyer string, fechaInicio *string, err error) {
+func (r *ParteDiarioRepo) GetFechaCierreActual(ctx context.Context, establecimientoID string) (fechaHoy, fechaAyer string, fechaInicio *string, err error) {
 	const sql = `
-		SELECT ((NOW() AT TIME ZONE 'America/La_Paz')::date - 1)::text,
+		SELECT ((NOW() AT TIME ZONE 'America/La_Paz')::date)::text,
+		       ((NOW() AT TIME ZONE 'America/La_Paz')::date - 1)::text,
 		       (SELECT fecha_inicio_operaciones::text
 		        FROM public.establecimientos_replica_cache
 		        WHERE establecimiento_id = $1)`
 	var inicio *string
-	if err := r.pool.QueryRow(ctx, sql, establecimientoID).Scan(&fechaAyer, &inicio); err != nil {
-		return "", nil, fmt.Errorf("fecha cierre actual: %w", err)
+	if err := r.pool.QueryRow(ctx, sql, establecimientoID).Scan(&fechaHoy, &fechaAyer, &inicio); err != nil {
+		return "", "", nil, fmt.Errorf("fecha cierre actual: %w", err)
 	}
-	return fechaAyer, inicio, nil
+	return fechaHoy, fechaAyer, inicio, nil
 }
 
 // GetFechaInicioOperaciones devuelve la fecha de inicio de operaciones desde la caché de réplica.
